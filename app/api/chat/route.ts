@@ -70,6 +70,36 @@ async function getRelevantResearchSnippets(question: string, topK = 4): Promise<
   }
 }
 
+async function getPerplexityAnswer(question: string): Promise<string> {
+  try {
+    // Replace with your actual Perplexity API endpoint and key
+    const PERPLEXITY_API_KEY = process.env.PERPLEXITY_API_KEY;
+    if (!PERPLEXITY_API_KEY) return '';
+    const response = await fetch('https://api.perplexity.ai/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${PERPLEXITY_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'pplx-70b-online',
+        messages: [
+          { role: 'system', content: 'You are a helpful assistant. Answer concisely and cite sources if possible.' },
+          { role: 'user', content: question }
+        ],
+        max_tokens: 400,
+        temperature: 0.7,
+      }),
+    });
+    if (!response.ok) return '';
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || '';
+  } catch (err) {
+    console.error('Error fetching answer from Perplexity:', err);
+    return '';
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { message, context, userProfile, userId } = await request.json();
@@ -150,7 +180,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch relevant research from Pinecone
-    const pineconeResearchContext = await getRelevantResearchSnippets(message, 4);
+    let pineconeResearchContext = await getRelevantResearchSnippets(message, 4);
+    // If Pinecone returns nothing, fallback to Perplexity
+    if (!pineconeResearchContext) {
+      pineconeResearchContext = await getPerplexityAnswer(message);
+      if (pineconeResearchContext) {
+        pineconeResearchContext = 'Perplexity answer (not from our research database):\n' + pineconeResearchContext;
+      }
+    }
 
     // Create the system prompt with user context, cycle phase, and research
     const systemPrompt = `You are a compassionate, knowledgeable health coach specializing in women's hormonal health. You have deep expertise in conditions like PCOS, PCOD, Endometriosis, and Thyroid disorders.
