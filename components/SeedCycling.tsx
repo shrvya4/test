@@ -27,6 +27,12 @@ function getLunarDay(today = new Date()) {
 }
 
 const SeedCycling: React.FC<SeedCyclingProps> = ({ userProfile }) => {
+  // Check for required data
+  const missingFields = [];
+  if (!userProfile?.lastPeriod) missingFields.push('the start date of your last period');
+  if (userProfile?.irregularPeriods === undefined) missingFields.push('whether your cycles are regular or irregular');
+  if (!userProfile?.cycleLength && userProfile?.irregularPeriods === false) missingFields.push('your typical cycle length');
+
   const getCurrentPhase = () => {
     if (userProfile?.irregularPeriods) {
       // Use lunar cycle
@@ -36,22 +42,21 @@ const SeedCycling: React.FC<SeedCyclingProps> = ({ userProfile }) => {
       if (lunarDay < 21) return 'Ovulatory';
       return 'Luteal';
     }
-    if (!userProfile?.lastPeriod) return 'Unknown';
-    
+    if (!userProfile?.lastPeriod || !userProfile?.cycleLength) return 'Unknown';
     const daysSinceLastPeriod = Math.floor(
       (new Date().getTime() - new Date(userProfile.lastPeriod).getTime()) / (1000 * 60 * 60 * 24)
     );
-    
+    const cycleLength = userProfile.cycleLength;
+    // Standard 28-day mapping, but use cycleLength if provided
     if (daysSinceLastPeriod >= 1 && daysSinceLastPeriod <= 5) {
       return 'Menstrual';
     } else if (daysSinceLastPeriod >= 6 && daysSinceLastPeriod <= 14) {
       return 'Follicular';
     } else if (daysSinceLastPeriod >= 15 && daysSinceLastPeriod <= 17) {
       return 'Ovulatory';
-    } else if (daysSinceLastPeriod >= 18 && daysSinceLastPeriod <= 28) {
+    } else if (daysSinceLastPeriod >= 18 && daysSinceLastPeriod <= cycleLength) {
       return 'Luteal';
     }
-    
     return 'Unknown';
   };
 
@@ -234,93 +239,93 @@ const SeedCycling: React.FC<SeedCyclingProps> = ({ userProfile }) => {
         </div>
       </div>
 
-      {userProfile?.irregularPeriods && (
-        <div className="mb-4 p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded text-yellow-800 text-sm">
-          Your cycle phase is estimated using the lunar cycle because you reported irregular periods. For best results, try tracking your symptoms and cycle dates.
-        </div>
-      )}
-
-      {currentPhase !== 'Unknown' ? (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <div className="mb-4">
-            <h3 className="text-lg font-semibold text-gray-800 mb-1">
-              {phaseData.title}
-            </h3>
-            <p className="text-sm text-gray-600 mb-4">
-              {phaseData.subtitle}
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            {phaseData.seeds.map((seed, index) => (
-              <motion.div
-                key={seed.name}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border border-green-100"
-              >
-                <div className="flex items-start space-x-3">
-                  <div className="bg-green-100 p-2 rounded-full">
-                    <Zap className="w-4 h-4 text-green-600" />
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-gray-800 mb-1">
-                      {seed.name}
-                    </h4>
-                    <p className="text-sm text-gray-600 mb-3">
-                      {seed.benefits}
-                    </p>
-                    
-                    <div className="mb-3">
-                      <h5 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
-                        <Clock className="w-4 h-4 mr-1" />
-                        Easy Ways to Consume:
-                      </h5>
-                      <ul className="space-y-1">
-                        {seed.easyWays.map((way, wayIndex) => (
-                          <li key={wayIndex} className="text-sm text-gray-600 flex items-start">
-                            <span className="text-green-500 mr-2">•</span>
-                            {way}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-
-          <div className="mt-6 bg-blue-50 rounded-xl p-4 border border-blue-100">
-            <h5 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
-              <Heart className="w-4 h-4 mr-1 text-blue-500" />
-              Pro Tips:
-            </h5>
-            <ul className="space-y-1">
-              {phaseData.tips.map((tip, tipIndex) => (
-                <li key={tipIndex} className="text-sm text-gray-600 flex items-start">
-                  <span className="text-blue-500 mr-2">•</span>
-                  {tip}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </motion.div>
-      ) : (
+      {missingFields.length > 0 ? (
         <div className="text-center py-8">
           <Sprout className="w-16 h-16 mx-auto mb-4 text-gray-300" />
           <p className="text-gray-500 mb-4">
-            Track your menstrual cycle to get personalized seed recommendations
+            To give you personalized seed cycling advice, could you please share {missingFields.join(', ')}?
           </p>
           <p className="text-sm text-gray-400">
-            Update your profile with your last period date to see cycle-specific seed advice
+            You can update this information in your profile or let me know in the chat!
           </p>
         </div>
+      ) : (
+        <>
+          {userProfile?.irregularPeriods && (
+            <div className="mb-4 p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded text-yellow-800 text-sm">
+              Your cycle phase is estimated using the lunar cycle because you reported irregular periods. For best results, try tracking your symptoms and cycle dates.
+            </div>
+          )}
+          {currentPhase !== 'Unknown' ? (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold text-gray-800 mb-1">
+                  {phaseData.title}
+                </h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  {phaseData.subtitle}
+                </p>
+              </div>
+              <div className="space-y-4">
+                {phaseData.seeds.map((seed, index) => (
+                  <motion.div
+                    key={seed.name}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                    className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border border-green-100"
+                  >
+                    <div className="flex items-start space-x-3">
+                      <div className="bg-green-100 p-2 rounded-full">
+                        <Zap className="w-4 h-4 text-green-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-gray-800 mb-1">
+                          {seed.name}
+                        </h4>
+                        <p className="text-sm text-gray-600 mb-3">
+                          {seed.benefits}
+                        </p>
+                        <div className="mb-3">
+                          <h5 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                            <Clock className="w-4 h-4 mr-1" />
+                            Easy Ways to Consume:
+                          </h5>
+                          <ul className="space-y-1">
+                            {seed.easyWays.map((way, wayIndex) => (
+                              <li key={wayIndex} className="text-sm text-gray-600 flex items-start">
+                                <span className="text-green-500 mr-2">•</span>
+                                {way}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+              <div className="mt-6 bg-blue-50 rounded-xl p-4 border border-blue-100">
+                <h5 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                  <Heart className="w-4 h-4 mr-1 text-blue-500" />
+                  Pro Tips:
+                </h5>
+                <ul className="space-y-1">
+                  {phaseData.tips.map((tip, tipIndex) => (
+                    <li key={tipIndex} className="text-sm text-gray-600 flex items-start">
+                      <span className="text-blue-500 mr-2">•</span>
+                      {tip}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </motion.div>
+          ) : null}
+        </>
       )}
     </div>
   );
