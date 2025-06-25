@@ -27,27 +27,35 @@ function getLunarDay(today = new Date()) {
 }
 
 const SeedCycling: React.FC<SeedCyclingProps> = ({ userProfile }) => {
-  // Check for required data
+  // Check for required data - be more lenient
   const missingFields = [];
-  if (!userProfile?.lastPeriod) missingFields.push('the start date of your last period');
-  if (userProfile?.irregularPeriods === undefined) missingFields.push('whether your cycles are regular or irregular');
-  if (!userProfile?.cycleLength && userProfile?.irregularPeriods === false) missingFields.push('your typical cycle length');
+  if (!userProfile?.lastPeriod && userProfile?.irregularPeriods !== true) {
+    missingFields.push('the start date of your last period');
+  }
+  if (userProfile?.irregularPeriods === undefined) {
+    missingFields.push('whether your cycles are regular or irregular');
+  }
 
   const getCurrentPhase = () => {
-    if (userProfile?.irregularPeriods) {
-      // Use lunar cycle
+    if (userProfile?.irregularPeriods === true) {
+      // Use lunar cycle for irregular periods
       const lunarDay = getLunarDay();
       if (lunarDay < 7) return 'Menstrual';
       if (lunarDay < 14) return 'Follicular';
       if (lunarDay < 21) return 'Ovulatory';
       return 'Luteal';
     }
-    if (!userProfile?.lastPeriod || !userProfile?.cycleLength) return 'Unknown';
+    
+    // For regular periods, use lastPeriod with default cycle length of 28
+    if (!userProfile?.lastPeriod) return 'Unknown';
+    
     const daysSinceLastPeriod = Math.floor(
       (new Date().getTime() - new Date(userProfile.lastPeriod).getTime()) / (1000 * 60 * 60 * 24)
     );
-    const cycleLength = userProfile.cycleLength;
-    // Standard 28-day mapping, but use cycleLength if provided
+    
+    const cycleLength = userProfile.cycleLength || 28; // Default to 28 days
+    
+    // Standard cycle phase calculation
     if (daysSinceLastPeriod >= 1 && daysSinceLastPeriod <= 5) {
       return 'Menstrual';
     } else if (daysSinceLastPeriod >= 6 && daysSinceLastPeriod <= 14) {
@@ -57,6 +65,7 @@ const SeedCycling: React.FC<SeedCyclingProps> = ({ userProfile }) => {
     } else if (daysSinceLastPeriod >= 18 && daysSinceLastPeriod <= cycleLength) {
       return 'Luteal';
     }
+    
     return 'Unknown';
   };
 

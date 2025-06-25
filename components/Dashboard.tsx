@@ -2,9 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { MessageCircle, Utensils, User, TrendingUp, Sparkles, BookOpen } from 'lucide-react';
+import { MessageCircle, User, Sparkles } from 'lucide-react';
 import ChatbotCoach from './ChatbotCoach';
-import MealPlanner from './MealPlanner';
 import ProfileEditor from './ProfileEditor';
 import SeedCycling from './SeedCycling';
 import ResearchSummary from './ResearchSummary';
@@ -122,7 +121,6 @@ const Dashboard: React.FC = () => {
         <div className="flex flex-wrap justify-center mb-8 space-x-2">
           {[
             { id: 'chat', label: 'Smart Coach', icon: MessageCircle },
-            { id: 'meals', label: 'Smart Meal Prep', icon: Utensils },
             { id: 'profile', label: 'Profile', icon: User }
           ].map((tab) => {
             const Icon = tab.icon;
@@ -183,51 +181,6 @@ const Dashboard: React.FC = () => {
               </motion.div>
             </div>
           </div>
-        )}
-
-        {activeTab === 'meals' && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="card"
-          >
-            <div className="flex flex-col items-center justify-center py-16">
-              <div className="bg-gradient-to-r from-accent-400 to-primary-400 p-4 rounded-full mb-6">
-                <Utensils className="w-12 h-12 text-white" />
-              </div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-4">Smart Meal Prep</h2>
-              <p className="text-gray-600 text-center mb-6 max-w-md">
-                Our advanced AI meal planning system is coming soon! Get ready for personalized meal plans, 
-                recipe suggestions, and smart grocery lists tailored to your cycle and health needs.
-              </p>
-              <div className="bg-gradient-to-r from-primary-50 to-accent-50 rounded-xl p-6 border border-primary-100">
-                <h3 className="font-semibold text-gray-800 mb-3">What's Coming:</h3>
-                <ul className="space-y-2 text-sm text-gray-600">
-                  <li className="flex items-center">
-                    <span className="text-primary-500 mr-2">✨</span>
-                    AI-powered meal recommendations
-                  </li>
-                  <li className="flex items-center">
-                    <span className="text-primary-500 mr-2">✨</span>
-                    Cycle-synced recipe suggestions
-                  </li>
-                  <li className="flex items-center">
-                    <span className="text-primary-500 mr-2">✨</span>
-                    Smart grocery shopping lists
-                  </li>
-                  <li className="flex items-center">
-                    <span className="text-primary-500 mr-2">✨</span>
-                    Nutritional analysis and tracking
-                  </li>
-                  <li className="flex items-center">
-                    <span className="text-primary-500 mr-2">✨</span>
-                    Meal prep time optimization
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </motion.div>
         )}
 
         {activeTab === 'profile' && (
