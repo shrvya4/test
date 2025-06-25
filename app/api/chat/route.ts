@@ -102,7 +102,7 @@ async function getPerplexityAnswer(question: string): Promise<string> {
 
 export async function POST(request: NextRequest) {
   try {
-    const { message, context, userProfile, userId } = await request.json();
+    const { message, context, userProfile, userId, conversationHistory } = await request.json();
 
     // Store user question in Firebase
     if (userId) {
@@ -189,8 +189,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create the system prompt with user context, cycle phase, and research
-    const systemPrompt = `You are a compassionate, knowledgeable health coach specializing in women's hormonal health. You have deep expertise in conditions like PCOS, PCOD, Endometriosis, and Thyroid disorders.
+    // Create the system prompt with improved prompt engineering
+    const systemPrompt = `You are Auvra, a compassionate, knowledgeable health coach specializing in women's hormonal health. You have deep expertise in conditions like PCOS, PCOD, Endometriosis, and Thyroid disorders.
+
+IMPORTANT RESPONSE GUIDELINES:
+- Always provide SPECIFIC, ACTIONABLE advice
+- Give exactly 3 concrete suggestions or recommendations
+- Be direct and avoid vague responses
+- Use bullet points for clarity
+- Reference the user's specific health conditions
+- Consider their current cycle phase
+- Keep responses focused and practical
 
 You are up-to-date with the latest research. Use the following research findings to inform your answers when relevant:
 ${pineconeResearchContext}
@@ -209,20 +218,28 @@ User Age Group: ${userProfile?.age || 'Not specified'}
 User Stress Level: ${userProfile?.stressLevel || 'Not specified'}
 User Sleep Quality: ${userProfile?.sleepQuality || 'Not specified'}
 
-Guidelines:
-- Always be supportive and encouraging
-- Provide practical, actionable advice
-- Use emojis to keep the tone friendly
-- Reference the user's specific health conditions when relevant
-- Consider their current cycle phase in your advice
-- Suggest lifestyle changes, diet tips, exercise, stress management, and sleep advice
-- If asked about medical treatments, recommend consulting healthcare providers
-- Keep responses informative but not overwhelming
-- Use bullet points and formatting for easy reading
-- Include seed recommendations (chia, flax, pumpkin, sunflower, sesame) for nutrition
-- Suggest lazy/easy meal prep methods (batch cooking, one-pot meals, 15-min meals)
-- Consider their stress and sleep levels in recommendations
-- If using the lunar cycle, explain this to the user in your response and encourage them to track their cycle for more accuracy.`;
+RESPONSE FORMAT:
+- Start with a brief, empathetic acknowledgment
+- Provide exactly 3 specific, actionable suggestions
+- Use bullet points (•) for each suggestion
+- End with a supportive, encouraging note
+- Keep total response under 200 words
+
+Remember: Be specific, actionable, and always provide exactly 3 concrete suggestions.`;
+
+    // Build messages array with conversation history
+    const messages = [
+      {
+        role: 'system',
+        content: systemPrompt
+      },
+      // Add conversation history for context
+      ...(conversationHistory || []),
+      {
+        role: 'user',
+        content: message
+      }
+    ];
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -232,17 +249,8 @@ Guidelines:
       },
       body: JSON.stringify({
         model: 'gpt-3.5-turbo',
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt
-          },
-          {
-            role: 'user',
-            content: message
-          }
-        ],
-        max_tokens: 500,
+        messages: messages,
+        max_tokens: 300,
         temperature: 0.7,
       }),
     });
@@ -324,104 +332,60 @@ function generateLocalResponse(message: string, userProfile: any): string {
 
     // Diet recommendations with seeds and cycle awareness
     if (lowerMessage.includes('diet') || lowerMessage.includes('food') || lowerMessage.includes('eat')) {
-      let cycleAdvice = '';
-      if (cyclePhase === 'Menstrual') {
-        cycleAdvice = `Since you're in your menstrual phase, focus on warm, comforting foods. Add chia seeds and pumpkin seeds for iron and magnesium. Try easy one-pot meals like soups and stews.`;
-      } else if (cyclePhase === 'Follicular') {
-        cycleAdvice = `You're in your follicular phase - great time for fresh, energizing foods! Add flax seeds and sunflower seeds to your meals. Try quick 10-15 minute prep meals.`;
-      } else if (cyclePhase === 'Ovulatory') {
-        cycleAdvice = `You're in your ovulatory phase - peak energy time! Include protein-rich foods with chia seeds and sesame seeds. Perfect for high-energy meals.`;
-      } else if (cyclePhase === 'Luteal') {
-        cycleAdvice = `You're in your luteal phase - focus on mood-supporting foods. Add pumpkin seeds and flax seeds for magnesium. Try batch cooking for easy meals.`;
-      }
-
       if (hasPCOS) {
-        return `For PCOS during your ${cyclePhase} phase, I recommend focusing on a low-glycemic diet with seeds for extra nutrition.\n\n✅ **Do's:**\n• Complex carbs (quinoa, brown rice, oats)\n• Lean proteins (chicken, fish, legumes)\n• Healthy fats (avocado, nuts, olive oil)\n• Anti-inflammatory foods (turmeric, ginger, leafy greens)\n• Seeds: chia, flax, pumpkin, sunflower\n\n❌ **Don'ts:**\n• Refined sugars and white flour\n• Processed foods\n• Excessive dairy\n• High-glycemic fruits\n\n${cycleAdvice}\n\nWould you like specific meal ideas or recipes?`;
+        return `I understand you're looking for PCOS-friendly diet advice during your ${cyclePhase} phase. Here are 3 specific recommendations:\n\n• **Start your day with a protein-rich breakfast** - Try Greek yogurt with chia seeds and berries to stabilize blood sugar\n• **Include anti-inflammatory foods** - Add turmeric to your meals and snack on walnuts for omega-3s\n• **Choose low-glycemic carbs** - Replace white rice with quinoa and add pumpkin seeds for extra nutrition\n\nThese changes can help manage insulin resistance and support your hormonal balance!`;
       } else if (hasThyroid) {
-        return `For thyroid health during your ${cyclePhase} phase, focus on these dietary guidelines with seed power:\n\n✅ **Do's:**\n• Iodine-rich foods (seaweed, fish, eggs)\n• Selenium sources (Brazil nuts, tuna, turkey)\n• Zinc-rich foods (oysters, beef, pumpkin seeds)\n• Vitamin D (fatty fish, fortified dairy)\n• Seeds: chia, flax, sesame\n\n❌ **Don'ts:**\n• Raw cruciferous vegetables (in excess)\n• Soy products (can interfere with medication)\n• Processed foods\n• Excessive caffeine\n\n${cycleAdvice}\n\nHow are you feeling with your current diet?`;
+        return `Great question about thyroid-supportive nutrition during your ${cyclePhase} phase! Here are 3 specific recommendations:\n\n• **Add iodine-rich foods daily** - Include seaweed snacks or fish 2-3 times per week for thyroid hormone production\n• **Include selenium sources** - Eat 2 Brazil nuts daily or add tuna to your meals for thyroid function\n• **Optimize vitamin D** - Spend 15 minutes in morning sunlight and include fortified dairy or fatty fish\n\nThese nutrients are essential for your thyroid health and energy levels!`;
       }
-      return `Here are some general healthy eating tips for hormonal balance during your ${cyclePhase} phase:\n\n✅ **Do's:**\n• Eat regular, balanced meals\n• Include plenty of vegetables\n• Choose whole grains\n• Stay hydrated\n• Include healthy fats\n• Add seeds: chia, flax, pumpkin, sunflower, sesame\n\n❌ **Don'ts:**\n• Skip meals\n• Eat too much processed food\n• Consume excessive sugar\n• Drink too much caffeine\n\n${cycleAdvice}\n\nWhat specific dietary concerns do you have?`;
+      return `I'd love to help you with healthy eating during your ${cyclePhase} phase! Here are 3 specific recommendations:\n\n• **Eat every 3-4 hours** - Include protein, healthy fats, and complex carbs in each meal to balance hormones\n• **Add seeds to your diet** - Sprinkle chia, flax, pumpkin, or sunflower seeds on meals for essential nutrients\n• **Stay hydrated with herbal teas** - Try chamomile for stress relief or peppermint for digestion\n\nThese simple changes can make a big difference in your energy and mood!`;
     }
 
     // Stress management with cycle awareness
     if (lowerMessage.includes('stress') || lowerMessage.includes('anxiety') || lowerMessage.includes('overwhelmed')) {
-      let cycleStressAdvice = '';
-      if (cyclePhase === 'Menstrual') {
-        cycleStressAdvice = `During your menstrual phase, be extra gentle with yourself. Try warm baths, gentle yoga, and plenty of rest.`;
-      } else if (cyclePhase === 'Follicular') {
-        cycleStressAdvice = `Your follicular phase is great for trying new stress management techniques. Channel your building energy into creative activities.`;
-      } else if (cyclePhase === 'Ovulatory') {
-        cycleStressAdvice = `Your ovulatory phase is perfect for high-energy stress relief like intense workouts or social activities.`;
-      } else if (cyclePhase === 'Luteal') {
-        cycleStressAdvice = `During your luteal phase, focus on calming activities and preparation. Try meditation and gentle movement.`;
-      }
-
       if (stressLevel === 'High') {
-        return `I understand you're dealing with high stress levels during your ${cyclePhase} phase. Here are some immediate relief techniques:\n\n🧘 **Quick Stress Relief:**\n• 4-7-8 breathing: Inhale 4s, hold 7s, exhale 8s\n• Progressive muscle relaxation\n• 5-minute meditation\n• Gentle stretching\n\n🌿 **Long-term Strategies:**\n• Regular exercise (even 10 minutes helps)\n• Consistent sleep schedule\n• Mindfulness practices\n• Setting boundaries\n\n${cycleStressAdvice}\n\nWould you like me to guide you through a quick breathing exercise?`;
+        return `I can see you're dealing with high stress during your ${cyclePhase} phase. Here are 3 immediate relief strategies:\n\n• **Practice 4-7-8 breathing** - Inhale 4 counts, hold 7, exhale 8, repeat 5 times whenever you feel overwhelmed\n• **Take a 10-minute walk** - Physical movement releases endorphins and helps clear your mind\n• **Create a worry window** - Set aside 15 minutes daily to write down concerns, then let them go\n\nRemember, it's okay to prioritize your mental health - you're doing great!`;
       }
-      return `Managing stress is crucial for hormonal health, especially during your ${cyclePhase} phase. Here are some effective strategies:\n\n🧘 **Mindfulness & Meditation:**\n• Start with 5-10 minutes daily\n• Use apps like Headspace or Calm\n• Practice deep breathing\n\n🏃 **Physical Activity:**\n• Yoga or gentle stretching\n• Walking in nature\n• Dancing to your favorite music\n\n💤 **Sleep Hygiene:**\n• Consistent bedtime routine\n• Avoid screens before bed\n• Create a calm sleep environment\n\n${cycleStressAdvice}\n\nWhat stress management technique would you like to try?`;
+      return `Managing stress is crucial for hormonal balance during your ${cyclePhase} phase. Here are 3 effective strategies:\n\n• **Start with 5-minute meditation** - Use apps like Headspace or simply focus on your breath\n• **Practice progressive muscle relaxation** - Tense and release each muscle group for 5 minutes daily\n• **Set clear boundaries** - Learn to say no and protect your energy, especially during this phase\n\nSmall daily practices add up to big stress relief!`;
     }
 
     // Sleep advice with cycle awareness
     if (lowerMessage.includes('sleep') || lowerMessage.includes('insomnia') || lowerMessage.includes('tired')) {
-      let cycleSleepAdvice = '';
-      if (cyclePhase === 'Menstrual') {
-        cycleSleepAdvice = `During your menstrual phase, you might need more sleep. Listen to your body and rest when needed.`;
-      } else if (cyclePhase === 'Follicular') {
-        cycleSleepAdvice = `Your follicular phase often brings better sleep quality. Use this time to establish good sleep habits.`;
-      } else if (cyclePhase === 'Ovulatory') {
-        cycleSleepAdvice = `Ovulatory phase can bring high energy. Make sure to wind down properly before bed.`;
-      } else if (cyclePhase === 'Luteal') {
-        cycleSleepAdvice = `Luteal phase can affect sleep. Try magnesium-rich foods and calming bedtime routines.`;
-      }
-
       if (sleepQuality === 'Poor' || sleepQuality === 'Fair') {
-        return `I see you're struggling with sleep quality during your ${cyclePhase} phase. Let's work on improving it:\n\n🌙 **Sleep Hygiene Tips:**\n• Go to bed and wake up at the same time daily\n• Create a relaxing bedtime routine\n• Keep your bedroom cool and dark\n• Avoid screens 1 hour before bed\n\n🍵 **Natural Sleep Aids:**\n• Chamomile tea\n• Lavender essential oil\n• Magnesium supplements (pumpkin seeds!)\n• Warm bath before bed\n\n📱 **Digital Detox:**\n• Use night mode on devices\n• Keep phones away from bed\n• Try reading instead of scrolling\n\n${cycleSleepAdvice}\n\nWould you like a personalized bedtime routine?`;
+        return `I understand sleep struggles during your ${cyclePhase} phase. Here are 3 specific improvements:\n\n• **Create a 1-hour bedtime routine** - No screens, try reading or gentle stretching, dim the lights\n• **Keep your bedroom at 65-68°F** - Cooler temperatures signal your body it's time to sleep\n• **Try magnesium before bed** - Take 200-400mg of magnesium glycinate 30 minutes before sleep\n\nBetter sleep is within reach - start with one change and build from there!`;
       }
-      return `Great sleep is essential for hormonal balance during your ${cyclePhase} phase! Here are some tips to maintain or improve your sleep quality:\n\n🌙 **Optimal Sleep Environment:**\n• Keep room temperature between 65-68°F\n• Use blackout curtains\n• White noise machine if needed\n• Comfortable, supportive mattress\n\n📱 **Technology Boundaries:**\n• No screens 1 hour before bed\n• Use blue light filters\n• Keep devices in another room\n\n🧘 **Relaxation Techniques:**\n• Gentle stretching\n• Meditation or deep breathing\n• Reading a book\n• Warm bath or shower\n\n${cycleSleepAdvice}\n\nHow's your current sleep routine?`;
+      return `Great sleep is essential for hormonal balance during your ${cyclePhase} phase! Here are 3 maintenance tips:\n\n• **Maintain consistent sleep/wake times** - Even on weekends, stay within 1 hour of your usual schedule\n• **Use blue light filters** - Enable night mode on devices 2 hours before bed\n• **Create a sleep sanctuary** - Keep your bedroom dark, quiet, and clutter-free\n\nYour body will thank you for these healthy sleep habits!`;
     }
 
     // Period tracking and cycle syncing
     if (lowerMessage.includes('period') || lowerMessage.includes('cycle') || lowerMessage.includes('menstrual')) {
       if (isIrregular) {
-        return `I understand you're dealing with irregular periods. Here are some strategies that might help:\n\n📅 **Cycle Tracking:**\n• Track your symptoms daily\n• Note any patterns or triggers\n• Use apps like Flo or Clue\n• Monitor stress and sleep\n\n🌿 **Natural Support:**\n• Vitex (chasteberry) supplements\n• Evening primrose oil\n• Regular exercise\n• Stress management\n\n🍽️ **Dietary Support:**\n• Omega-3 fatty acids (chia seeds, flax seeds)\n• Vitamin D\n• Magnesium (pumpkin seeds)\n• B-complex vitamins\n\nRemember, irregular periods can have many causes. Have you discussed this with your healthcare provider?`;
+        return `I understand irregular periods can be challenging. Here are 3 specific strategies:\n\n• **Track symptoms daily** - Use apps like Flo or Clue to identify patterns and triggers\n• **Try vitex supplements** - Take 400mg daily for 3-6 months to support regular cycles\n• **Manage stress with yoga** - Practice gentle yoga 3 times per week to reduce cortisol levels\n\nRemember, irregular periods often improve with consistent lifestyle changes!`;
       }
-      return `Understanding your menstrual cycle is key to hormonal health! You're currently in your ${cyclePhase} phase. Here's how to work with your cycle:\n\n🌙 **Cycle Phases & Self-Care:**\n\n**Menstrual Phase (Days 1-5):**\n• Rest and gentle movement\n• Warm foods and teas\n• Self-compassion and reflection\n• Add pumpkin seeds for iron\n\n**Follicular Phase (Days 6-14):**\n• Increased energy for exercise\n• Creative projects\n• Social activities\n• Add flax seeds for energy\n\n**Ovulatory Phase (Days 15-17):**\n• Peak energy and confidence\n• High-intensity workouts\n• Important conversations\n• Add chia seeds for protein\n\n**Luteal Phase (Days 18-28):**\n• Slower, mindful movement\n• Nourishing foods\n• Preparation and planning\n• Add sunflower seeds for mood\n\nWould you like to learn more about your current phase?`;
+      return `Understanding your cycle is key to hormonal health! You're in your ${cyclePhase} phase. Here are 3 phase-specific tips:\n\n• **Menstrual (Days 1-5)**: Rest more, eat warm foods, add pumpkin seeds for iron\n• **Follicular (Days 6-14)**: Increase exercise, try new activities, add flax seeds for energy\n• **Ovulatory (Days 15-17)**: Peak energy time, perfect for important conversations and workouts\n• **Luteal (Days 18-28)**: Focus on preparation, slower movement, add sunflower seeds for mood\n\nWorking with your cycle can transform your energy and mood!`;
     }
 
     // Exercise recommendations with cycle awareness
     if (lowerMessage.includes('exercise') || lowerMessage.includes('workout') || lowerMessage.includes('fitness')) {
-      let cycleExerciseAdvice = '';
-      if (cyclePhase === 'Menstrual') {
-        cycleExerciseAdvice = `During your menstrual phase, focus on gentle movement like walking, yoga, or swimming. Listen to your body and rest when needed.`;
-      } else if (cyclePhase === 'Follicular') {
-        cycleExerciseAdvice = `Your follicular phase is perfect for trying new workouts and building strength. Your energy is naturally higher now.`;
-      } else if (cyclePhase === 'Ovulatory') {
-        cycleExerciseAdvice = `Ovulatory phase is your peak performance time! Great for high-intensity workouts and challenging yourself.`;
-      } else if (cyclePhase === 'Luteal') {
-        cycleExerciseAdvice = `During your luteal phase, focus on moderate exercise and preparation. Yoga and pilates are excellent choices.`;
-      }
-
       if (hasPCOS) {
-        return `Exercise is especially important for PCOS management! Here are some recommendations for your ${cyclePhase} phase:\n\n💪 **Best Exercises for PCOS:**\n• Strength training (2-3 times/week)\n• HIIT workouts (20-30 minutes)\n• Walking or light cardio\n• Yoga for stress relief\n\n🎯 **Benefits:**\n• Improves insulin sensitivity\n• Helps with weight management\n• Reduces stress hormones\n• Supports regular cycles\n\n⏰ **Timing:**\n• Morning workouts can help with energy\n• Avoid late evening (can affect sleep)\n• Listen to your body's signals\n\n${cycleExerciseAdvice}\n\nStart with 20-30 minutes, 3-4 times per week. What type of exercise do you enjoy?`;
+        return `Exercise is especially important for PCOS during your ${cyclePhase} phase! Here are 3 specific recommendations:\n\n• **Strength train 3 times per week** - Focus on compound movements like squats and deadlifts to improve insulin sensitivity\n• **Add 20-minute HIIT sessions** - High-intensity intervals 2-3 times per week for metabolic benefits\n• **Include daily walking** - Aim for 10,000 steps to support weight management and stress reduction\n\nThese exercises specifically help manage PCOS symptoms and hormone balance!`;
       }
-      return `Regular exercise is fantastic for hormonal health during your ${cyclePhase} phase! Here are some recommendations:\n\n💪 **Types of Exercise:**\n• Strength training (2-3 times/week)\n• Cardiovascular exercise (3-5 times/week)\n• Flexibility work (yoga, stretching)\n• Mind-body practices (pilates, tai chi)\n\n🎯 **Benefits for Hormonal Health:**\n• Reduces stress hormones\n• Improves insulin sensitivity\n• Supports healthy weight\n• Better sleep quality\n• Mood enhancement\n\n⏰ **Getting Started:**\n• Start with 20-30 minutes daily\n• Choose activities you enjoy\n• Gradually increase intensity\n• Listen to your body\n\n${cycleExerciseAdvice}\n\nWhat type of movement feels good to you?`;
+      return `Regular exercise is fantastic for hormonal health during your ${cyclePhase} phase! Here are 3 specific recommendations:\n\n• **Strength train 2-3 times per week** - Build muscle to support metabolism and bone health\n• **Include 30 minutes of cardio** - Walking, cycling, or swimming 3-5 times per week\n• **Add flexibility work** - Yoga or stretching 2-3 times per week for stress relief\n\nMovement is medicine for your hormones and mood!`;
     }
   }
 
   // General responses
   if (lowerMessage.includes('hello') || lowerMessage.includes('hi')) {
-    return `Hello! 👋 I'm here to support your health journey. I can help with diet advice, stress management, sleep tips, exercise recommendations, and more. What would you like to focus on today?`;
+    return `Hello! 👋 I'm Auvra, your personal health coach. Here are 3 ways I can help you today:\n\n• **Nutrition guidance** - Get personalized diet recommendations for your health conditions\n• **Stress management** - Learn specific techniques for your stress level and cycle phase\n• **Sleep optimization** - Discover strategies to improve your sleep quality\n\nWhat would you like to focus on first?`;
   }
 
   if (lowerMessage.includes('help') || lowerMessage.includes('what can you do')) {
-    return `I'm your personal health coach! Here's how I can help you:\n\n🍽️ **Nutrition & Diet:**\n• Personalized meal recommendations\n• Food dos and don'ts for your conditions\n• Recipe suggestions with seeds\n• Supplement advice\n\n🧘 **Wellness & Lifestyle:**\n• Stress management techniques\n• Sleep improvement tips\n• Exercise recommendations\n• Mindfulness practices\n\n📅 **Cycle & Hormonal Health:**\n• Period tracking guidance\n• Cycle syncing advice\n• Symptom management\n• Natural remedies\n\n💡 **General Support:**\n• Answer health questions\n• Provide motivation\n• Share evidence-based tips\n• Emotional support\n\nWhat area would you like to explore?`;
+    return `I'm Auvra, your personal health coach! Here are 3 main areas I specialize in:\n\n• **Hormonal health support** - PCOS, Thyroid, Endometriosis, and cycle-specific advice\n• **Lifestyle optimization** - Diet, exercise, stress, and sleep recommendations\n• **Evidence-based guidance** - Research-backed tips tailored to your unique profile\n\nI'm here to support your wellness journey with personalized, actionable advice!`;
   }
 
   if (lowerMessage.includes('thank')) {
-    return `You're very welcome! 💜 I'm here to support you on your health journey. Remember, small changes add up to big results. Is there anything else you'd like to chat about?`;
+    return `You're very welcome! 💜 I'm here to support your health journey. Here are 3 things to remember:\n\n• **Small changes create big results** - Start with one habit at a time\n• **Listen to your body** - It knows what you need better than anyone\n• **Be patient with yourself** - Health is a journey, not a destination\n\nYou're doing amazing - keep going!`;
   }
 
   // Default response
-  return `That's an interesting question! I'd love to help you with that. Could you tell me a bit more about what you're looking for? I can help with diet, exercise, stress management, sleep, hormonal health, and more. What specific area would you like to focus on?`;
+  return `That's a great question! I'd love to help you with that. Here are 3 ways I can support you:\n\n• **Personalized advice** - Based on your health conditions and cycle phase\n• **Specific recommendations** - Actionable steps you can take today\n• **Evidence-based guidance** - Research-backed strategies for your unique needs\n\nWhat specific area would you like to focus on?`;
 } 

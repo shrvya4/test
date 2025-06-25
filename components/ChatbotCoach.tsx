@@ -66,6 +66,15 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
         - Period Duration: ${userProfile.periodDuration} days
       ` : 'No user profile available';
 
+      // Create conversation history for context
+      const conversationHistory = messages
+        .filter(msg => msg.sender === 'user' || msg.sender === 'bot')
+        .slice(-6) // Keep last 6 messages for context
+        .map(msg => ({
+          role: msg.sender === 'user' ? 'user' : 'assistant',
+          content: msg.text
+        }));
+
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -75,7 +84,8 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
           message: userMessage,
           context: context,
           userProfile: userProfile,
-          userId: user?.uid
+          userId: user?.uid,
+          conversationHistory: conversationHistory
         }),
       });
 
