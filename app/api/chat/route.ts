@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { doc, addDoc, collection, serverTimestamp, getDocs, query, orderBy, limit, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import OpenAI from 'openai';
+import { Pinecone } from '@pinecone-database/pinecone';
+
+const PINECONE_API_KEY = process.env.PINECONE_API_KEY;
+const PINECONE_ENVIRONMENT = process.env.PINECONE_ENVIRONMENT;
+const PINECONE_INDEX = process.env.PINECONE_INDEX;
 
 async function getRecentResearchSummary() {
   try {
@@ -28,6 +34,38 @@ async function getRecentResearchSummary() {
     return summaryText;
   } catch (err) {
     console.error('Error fetching research summary:', err);
+    return '';
+  }
+}
+
+async function getRelevantResearchSnippets(question: string, topK = 4): Promise<string> {
+  if (!PINECONE_API_KEY || !PINECONE_INDEX) return '';
+  try {
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const pinecone = new Pinecone({ apiKey: PINECONE_API_KEY });
+    const index = pinecone.Index(PINECONE_INDEX);
+    // Embed the question
+    const embeddingResponse = await openai.embeddings.create({
+      model: 'text-embedding-ada-002',
+      input: question,
+    });
+    const questionEmbedding = embeddingResponse.data[0].embedding;
+    // Query Pinecone
+    const queryResult = await index.query({
+      topK,
+      vector: questionEmbedding,
+      includeMetadata: true,
+    });
+    if (!queryResult.matches || queryResult.matches.length === 0) return '';
+    let context = 'Relevant research findings:\n';
+    for (const match of queryResult.matches) {
+      const meta = match.metadata as any;
+      context += `- ${meta?.title ? meta.title + ': ' : ''}${meta?.text || ''}\n`;
+      if (meta?.url) context += `  [Read more](${meta.url})\n`;
+    }
+    return context;
+  } catch (err) {
+    console.error('Error fetching relevant research from Pinecone:', err);
     return '';
   }
 }
@@ -111,14 +149,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Fetch recent research summary
-    const researchSummary = await getRecentResearchSummary();
+    // Fetch relevant research from Pinecone
+    const pineconeResearchContext = await getRelevantResearchSnippets(message, 4);
 
     // Create the system prompt with user context, cycle phase, and research
     const systemPrompt = `You are a compassionate, knowledgeable health coach specializing in women's hormonal health. You have deep expertise in conditions like PCOS, PCOD, Endometriosis, and Thyroid disorders.
 
-You are up-to-date with the latest research. Use the following recent research findings to inform your answers when relevant:
-${researchSummary}
+You are up-to-date with the latest research. Use the following research findings to inform your answers when relevant:
+${pineconeResearchContext}
 
 Your personality is warm, supportive, and like a caring older sister. You provide evidence-based advice while being empathetic and understanding.
 
