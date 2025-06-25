@@ -12,6 +12,7 @@ interface OnboardingData {
   diagnosis: string[];
   symptoms: string[];
   lastPeriod: Date;
+  cycleLength: number;
   periodDuration: number;
   irregularPeriods: boolean;
   stressLevel: string;
@@ -30,6 +31,7 @@ export default function Onboarding() {
     diagnosis: [],
     symptoms: [],
     lastPeriod: new Date(),
+    cycleLength: 28,
     periodDuration: 5,
     irregularPeriods: false,
     stressLevel: '',
@@ -69,7 +71,7 @@ export default function Onboarding() {
   };
 
   const nextStep = () => {
-    if (currentStep < 5) {
+    if (currentStep < 6) {
       setCurrentStep(currentStep + 1);
     }
   };
@@ -88,6 +90,7 @@ export default function Onboarding() {
       // Save to Firebase
       await setDoc(doc(db, 'users', user.uid), {
         ...formData,
+        lastPeriod: formData.lastPeriod.toISOString(),
         email: user.email,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -115,6 +118,8 @@ export default function Onboarding() {
       case 3:
         return formData.symptoms.length > 0;
       case 4:
+        return formData.lastPeriod && formData.cycleLength > 0;
+      case 5:
         return formData.stressLevel !== '' && formData.sleepQuality !== '';
       default:
         return true;
@@ -250,6 +255,102 @@ export default function Onboarding() {
             className="space-y-6"
           >
             <div className="text-center mb-8">
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">Period Tracking</h2>
+              <p className="text-gray-600">Help us understand your menstrual cycle for personalized recommendations</p>
+            </div>
+
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  When did your last period start?
+                </label>
+                <input
+                  type="date"
+                  value={formData.lastPeriod.toISOString().split('T')[0]}
+                  onChange={(e) => handleInputChange('lastPeriod', new Date(e.target.value))}
+                  className="input-field w-full"
+                  max={new Date().toISOString().split('T')[0]}
+                />
+                <p className="text-xs text-gray-500 mt-1">This helps us calculate your current cycle phase</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  Do you have regular periods?
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="flex items-center p-4 border border-lavender-200 rounded-xl cursor-pointer hover:bg-lavender-50 transition-colors">
+                    <input
+                      type="radio"
+                      name="irregularPeriods"
+                      value="false"
+                      checked={formData.irregularPeriods === false}
+                      onChange={() => handleInputChange('irregularPeriods', false)}
+                      className="radio-custom mr-3"
+                    />
+                    <span className="text-sm font-medium">Yes, regular</span>
+                  </label>
+                  <label className="flex items-center p-4 border border-lavender-200 rounded-xl cursor-pointer hover:bg-lavender-50 transition-colors">
+                    <input
+                      type="radio"
+                      name="irregularPeriods"
+                      value="true"
+                      checked={formData.irregularPeriods === true}
+                      onChange={() => handleInputChange('irregularPeriods', true)}
+                      className="radio-custom mr-3"
+                    />
+                    <span className="text-sm font-medium">No, irregular</span>
+                  </label>
+                </div>
+              </div>
+
+              {formData.irregularPeriods === false && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    What's your typical cycle length? (days)
+                  </label>
+                  <input
+                    type="number"
+                    min="21"
+                    max="35"
+                    value={formData.cycleLength}
+                    onChange={(e) => handleInputChange('cycleLength', Number(e.target.value))}
+                    className="input-field w-full"
+                    placeholder="28"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Most women have cycles between 21-35 days</p>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  How long do your periods typically last? (days)
+                </label>
+                <input
+                  type="number"
+                  min="2"
+                  max="10"
+                  value={formData.periodDuration}
+                  onChange={(e) => handleInputChange('periodDuration', Number(e.target.value))}
+                  className="input-field w-full"
+                  placeholder="5"
+                />
+                <p className="text-xs text-gray-500 mt-1">Typical period duration is 3-7 days</p>
+              </div>
+            </div>
+          </motion.div>
+        );
+
+      case 5:
+        return (
+          <motion.div
+            key="step5"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className="space-y-6"
+          >
+            <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-gray-800 mb-2">Lifestyle & Wellness</h2>
               <p className="text-gray-600">Help us understand your current lifestyle factors</p>
             </div>
@@ -300,10 +401,10 @@ export default function Onboarding() {
           </motion.div>
         );
 
-      case 5:
+      case 6:
         return (
           <motion.div
-            key="step5"
+            key="step6"
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
@@ -345,12 +446,20 @@ export default function Onboarding() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <h3 className="font-medium text-gray-800 mb-2">Stress Level</h3>
-                  <p className="text-gray-600">{formData.stressLevel}</p>
+                  <h3 className="font-medium text-gray-800 mb-2">Period Data</h3>
+                  <p className="text-gray-600">
+                    Last period: {formData.lastPeriod.toLocaleDateString()}<br/>
+                    Cycle length: {formData.cycleLength} days<br/>
+                    Period duration: {formData.periodDuration} days<br/>
+                    Regular periods: {formData.irregularPeriods ? 'No' : 'Yes'}
+                  </p>
                 </div>
                 <div>
-                  <h3 className="font-medium text-gray-800 mb-2">Sleep Quality</h3>
-                  <p className="text-gray-600">{formData.sleepQuality}</p>
+                  <h3 className="font-medium text-gray-800 mb-2">Lifestyle</h3>
+                  <p className="text-gray-600">
+                    Stress level: {formData.stressLevel}<br/>
+                    Sleep quality: {formData.sleepQuality}
+                  </p>
                 </div>
               </div>
             </div>
@@ -369,14 +478,14 @@ export default function Onboarding() {
           {/* Progress Bar */}
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
-              <span className="text-sm font-medium text-gray-600">Step {currentStep} of 5</span>
-              <span className="text-sm font-medium text-gray-600">{Math.round((currentStep / 5) * 100)}%</span>
+              <span className="text-sm font-medium text-gray-600">Step {currentStep} of 6</span>
+              <span className="text-sm font-medium text-gray-600">{Math.round((currentStep / 6) * 100)}%</span>
             </div>
             <div className="w-full bg-lavender-200 rounded-full h-2">
               <motion.div
                 className="bg-gradient-to-r from-primary-400 to-accent-400 h-2 rounded-full"
                 initial={{ width: 0 }}
-                animate={{ width: `${(currentStep / 5) * 100}%` }}
+                animate={{ width: `${(currentStep / 6) * 100}%` }}
                 transition={{ duration: 0.3 }}
               />
             </div>
@@ -398,7 +507,7 @@ export default function Onboarding() {
               <span>Previous</span>
             </button>
 
-            {currentStep < 5 ? (
+            {currentStep < 6 ? (
               <button
                 onClick={nextStep}
                 disabled={!canProceed()}
