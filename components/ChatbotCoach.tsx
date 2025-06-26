@@ -27,6 +27,7 @@ interface UserProfile {
   sleepQuality?: string;
   otherDiagnosis?: string;
   otherSymptoms?: string;
+  name?: string;
 }
 
 interface ChatbotCoachProps {
@@ -413,20 +414,16 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
   // On new session, start the goal flow
   useEffect(() => {
     if (messages.length === 0 && userProfile) {
+      const username = userProfile.name || userProfile.age || 'there';
       const goals = getUserGoals(userProfile);
-      const goalMsg = goals.length === 1
-        ? `Hi, I'm here to support you in ${goals[0]}. 🌸 Let's make today simple and doable.`
-        : `Hi, I'm here to support you in ${goals.map(g => `*${g}*`).join(' and ')}. 🌸 Let's make today simple and doable.`;
+      const goalList = goals.length === 1
+        ? goals[0]
+        : goals.slice(0, -1).join(', ') + (goals.length > 1 ? ' and ' + goals[goals.length - 1] : '');
+      const goalMsg = `Hi ${username}, I'm Auvra, your hormone buddy, I'm here to support you in ${goalList}. How many self-care actions you want to take today?`;
       setMessages([
         {
           id: 'welcome',
           text: goalMsg,
-          sender: 'bot',
-          timestamp: new Date(),
-        },
-        {
-          id: 'howmany',
-          text: 'How many small actions would you like to take today to move toward your goal? You can pick 1, 2 or 3 — whatever feels easiest for you right now.',
           sender: 'bot',
           timestamp: new Date(),
         },
