@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Check, ArrowRight, ArrowLeft, Save } from 'lucide-react';
 
 interface OnboardingData {
+  name: string;
   age: string;
   diagnosis: string[];
   symptoms: string[];
@@ -27,6 +28,7 @@ export default function Onboarding() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [formData, setFormData] = useState<OnboardingData>({
+    name: '',
     age: '',
     diagnosis: [],
     symptoms: [],
@@ -71,7 +73,7 @@ export default function Onboarding() {
   };
 
   const nextStep = () => {
-    if (currentStep < 6) {
+    if (currentStep < 7) {
       setCurrentStep(currentStep + 1);
     }
   };
@@ -112,14 +114,16 @@ export default function Onboarding() {
   const canProceed = () => {
     switch (currentStep) {
       case 1:
-        return formData.age !== '';
+        return formData.name.trim() !== '';
       case 2:
-        return formData.diagnosis.length > 0;
+        return formData.age !== '';
       case 3:
-        return formData.symptoms.length > 0;
+        return formData.diagnosis.length > 0;
       case 4:
-        return formData.lastPeriod && formData.cycleLength > 0;
+        return formData.symptoms.length > 0;
       case 5:
+        return formData.lastPeriod && formData.cycleLength > 0;
+      case 6:
         return formData.stressLevel !== '' && formData.sleepQuality !== '';
       default:
         return true;
@@ -131,7 +135,7 @@ export default function Onboarding() {
       case 1:
         return (
           <motion.div
-            key="step1"
+            key="step0"
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
@@ -139,12 +143,41 @@ export default function Onboarding() {
           >
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-gray-800 mb-2">Welcome to Your Health Journey</h2>
-              <p className="text-gray-600">Let's personalize your experience by understanding your health profile</p>
+              <p className="text-gray-600">Let's personalize your experience by getting to know you!</p>
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-4">
-                What's your age group?
+                What would you like me to call you?
+              </label>
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={e => handleInputChange('name', e.target.value)}
+                className="input-field"
+                placeholder="Your name"
+                required
+              />
+            </div>
+          </motion.div>
+        );
+
+      case 2:
+        return (
+          <motion.div
+            key="step1"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className="space-y-6"
+          >
+            <div className="text-center mb-8">
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">What's your age group?</h2>
+              <p className="text-gray-600">Select your age group</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-4">
+                Age Group
               </label>
               <div className="grid grid-cols-2 gap-3">
                 {ageGroups.map((age) => (
@@ -165,7 +198,7 @@ export default function Onboarding() {
           </motion.div>
         );
 
-      case 2:
+      case 3:
         return (
           <motion.div
             key="step2"
@@ -205,7 +238,7 @@ export default function Onboarding() {
           </motion.div>
         );
 
-      case 3:
+      case 4:
         return (
           <motion.div
             key="step3"
@@ -245,7 +278,7 @@ export default function Onboarding() {
           </motion.div>
         );
 
-      case 4:
+      case 5:
         return (
           <motion.div
             key="step4"
@@ -341,7 +374,7 @@ export default function Onboarding() {
           </motion.div>
         );
 
-      case 5:
+      case 6:
         return (
           <motion.div
             key="step5"
@@ -401,7 +434,7 @@ export default function Onboarding() {
           </motion.div>
         );
 
-      case 6:
+      case 7:
         return (
           <motion.div
             key="step6"
@@ -478,14 +511,14 @@ export default function Onboarding() {
           {/* Progress Bar */}
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
-              <span className="text-sm font-medium text-gray-600">Step {currentStep} of 6</span>
-              <span className="text-sm font-medium text-gray-600">{Math.round((currentStep / 6) * 100)}%</span>
+              <span className="text-sm font-medium text-gray-600">Step {currentStep} of 7</span>
+              <span className="text-sm font-medium text-gray-600">{Math.round((currentStep / 7) * 100)}%</span>
             </div>
             <div className="w-full bg-lavender-200 rounded-full h-2">
               <motion.div
                 className="bg-gradient-to-r from-primary-400 to-accent-400 h-2 rounded-full"
                 initial={{ width: 0 }}
-                animate={{ width: `${(currentStep / 6) * 100}%` }}
+                animate={{ width: `${(currentStep / 7) * 100}%` }}
                 transition={{ duration: 0.3 }}
               />
             </div>
@@ -507,7 +540,7 @@ export default function Onboarding() {
               <span>Previous</span>
             </button>
 
-            {currentStep < 6 ? (
+            {currentStep < 7 ? (
               <button
                 onClick={nextStep}
                 disabled={!canProceed()}
