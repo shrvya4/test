@@ -51,10 +51,48 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
     scrollToBottom();
   }, [messages]);
 
-  // Helper to generate the onboarding message
+  // Helper: Map symptoms/concerns to positive goals
+  const concernToGoal: { [key: string]: string } = {
+    'acne': 'clearer skin',
+    'irregular periods': 'regulating your cycle',
+    'fatigue': 'more energy',
+    'weight gain': 'sustainable weight management',
+    'anxiety': 'feeling more balanced',
+    'hair fall': 'stronger hair',
+    'mood swings': 'emotional balance',
+    'other': 'better wellbeing',
+  };
+
+  // Helper: Check if all goals are noun phrases (not starting with a verb)
+  const areAllNounPhrases = (goals: string[]) => {
+    const verbStarters = ['regulating', 'feeling'];
+    return goals.every(goal => !verbStarters.some(v => goal.startsWith(v)));
+  };
+
+  const getUserGoals = (userProfile: any): string[] => {
+    if (!userProfile) return [];
+    const goals: string[] = [];
+    if (userProfile.symptoms && userProfile.symptoms.length) {
+      for (const s of userProfile.symptoms) {
+        const key = String(s).toLowerCase();
+        if (concernToGoal[key] && !goals.includes(concernToGoal[key])) goals.push(concernToGoal[key]);
+      }
+    }
+    // Fallback: use diagnosis
+    if (goals.length === 0 && userProfile.diagnosis && userProfile.diagnosis.length) {
+      for (const d of userProfile.diagnosis) {
+        const key = String(d).toLowerCase();
+        if (concernToGoal[key] && !goals.includes(concernToGoal[key])) goals.push(concernToGoal[key]);
+      }
+    }
+    // Fallback: generic
+    if (goals.length === 0) goals.push('better wellbeing');
+    return goals.slice(0, 2);
+  };
+
   const getOnboardingMessage = (profile: any) => {
     let username = profile?.name && profile.name.trim() !== '' ? profile.name.trim() : '';
-    const goals = getUserGoals(profile).map(goal => goal.charAt(0).toLowerCase() + goal.slice(1));
+    const goals = getUserGoals(profile);
     let goalList = '';
     if (goals.length === 1) {
       goalList = goals[0];
@@ -63,11 +101,18 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
     } else if (goals.length > 2) {
       goalList = goals.slice(0, -1).join(', ') + ', and ' + goals[goals.length - 1];
     }
-    const achievePhrase = goalList ? `in achieving ${goalList}` : '';
+    let supportPhrase = '';
+    if (goals.length === 1) {
+      supportPhrase = `in ${goalList}`;
+    } else if (goals.length > 1 && areAllNounPhrases(goals)) {
+      supportPhrase = `in achieving ${goalList}`;
+    } else if (goals.length > 1) {
+      supportPhrase = `in ${goalList}`;
+    }
     if (username) {
-      return `Hi ${username}, I'm Auvra, your hormone buddy. I'm here to support you ${achievePhrase}. How many self-care actions would you like to take today?`;
+      return `Hi ${username}, I'm Auvra, your hormone buddy. I'm here to support you ${supportPhrase}. How many self-care actions would you like to take today?`;
     } else {
-      return `Hi, I'm Auvra, your hormone buddy. I'm here to support you ${achievePhrase}. How many self-care actions would you like to take today?`;
+      return `Hi, I'm Auvra, your hormone buddy. I'm here to support you ${supportPhrase}. How many self-care actions would you like to take today?`;
     }
   };
 
@@ -401,39 +446,6 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
       summary += `• ${u.field.replace(/([A-Z])/g, ' $1').toLowerCase()} updated to ${typeof u.value === 'boolean' ? (u.value ? 'Yes' : 'No') : u.value} on ${u.timestamp.toLocaleDateString()}\n`;
     });
     return summary;
-  };
-
-  // Helper: Map symptoms/concerns to positive goals
-  const concernToGoal: { [key: string]: string } = {
-    'acne': 'clearer skin',
-    'irregular periods': 'regulating your cycle',
-    'fatigue': 'more energy',
-    'weight gain': 'sustainable weight management',
-    'anxiety': 'feeling more balanced',
-    'hair fall': 'stronger hair',
-    'mood swings': 'emotional balance',
-    'other': 'better wellbeing',
-  };
-
-  const getUserGoals = (userProfile: any): string[] => {
-    if (!userProfile) return [];
-    const goals: string[] = [];
-    if (userProfile.symptoms && userProfile.symptoms.length) {
-      for (const s of userProfile.symptoms) {
-        const key = String(s).toLowerCase();
-        if (concernToGoal[key] && !goals.includes(concernToGoal[key])) goals.push(concernToGoal[key]);
-      }
-    }
-    // Fallback: use diagnosis
-    if (goals.length === 0 && userProfile.diagnosis && userProfile.diagnosis.length) {
-      for (const d of userProfile.diagnosis) {
-        const key = String(d).toLowerCase();
-        if (concernToGoal[key] && !goals.includes(concernToGoal[key])) goals.push(concernToGoal[key]);
-      }
-    }
-    // Fallback: generic
-    if (goals.length === 0) goals.push('better wellbeing');
-    return goals.slice(0, 2);
   };
 
   // Chatbot state for onboarding flow
