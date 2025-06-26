@@ -51,17 +51,29 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
     scrollToBottom();
   }, [messages]);
 
+  // Helper to generate the onboarding message
+  const getOnboardingMessage = (profile: any) => {
+    const username = profile?.name || profile?.age || 'there';
+    const goals = getUserGoals(profile);
+    const goalList = goals.length === 1
+      ? goals[0]
+      : goals.slice(0, -1).join(', ') + (goals.length > 1 ? ' and ' + goals[goals.length - 1] : '');
+    return `Hi ${username}, I'm Auvra, your hormone buddy, I'm here to support you in ${goalList}. How many self-care actions you want to take today?`;
+  };
+
   // Load conversation history from Firebase
   useEffect(() => {
     const loadConversationHistory = async () => {
       if (!user?.uid) {
-        // If no user, show welcome message
-        setMessages([{
-          id: '1',
-          text: `Hi there! 👋 I'm Auvra, your personal health coach, and I'm here to support you on your wellness journey. I can help you with diet recommendations, stress management, sleep tips, and so much more. What would you like to chat about today?`,
-          sender: 'bot',
-          timestamp: new Date(),
-        }]);
+        // If no user, show personalized onboarding message
+        setMessages([
+          {
+            id: 'welcome',
+            text: getOnboardingMessage(userProfile),
+            sender: 'bot',
+            timestamp: new Date(),
+          },
+        ]);
         setIsLoadingHistory(false);
         return;
       }
@@ -79,46 +91,54 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
                 timestamp: msg.timestamp instanceof Timestamp ? msg.timestamp.toDate() : new Date(msg.timestamp)
               }))
               .filter((msg: any) => differenceInDays(now, msg.timestamp) <= 30);
-            setMessages(loadedMessages.length > 0 ? loadedMessages : [{
-              id: '1',
-              text: `Hi there! 👋 I'm Auvra, your personal health coach, and I'm here to support you on your wellness journey. I can help you with diet recommendations, stress management, sleep tips, and so much more. What would you like to chat about today?`,
-              sender: 'bot',
-              timestamp: new Date(),
-            }]);
+            setMessages(loadedMessages.length > 0 ? loadedMessages : [
+              {
+                id: 'welcome',
+                text: getOnboardingMessage(userProfile),
+                sender: 'bot',
+                timestamp: new Date(),
+              },
+            ]);
           } else {
-            // No previous conversation, show welcome message
-            setMessages([{
-              id: '1',
-              text: `Hi there! 👋 I'm Auvra, your personal health coach, and I'm here to support you on your wellness journey. I can help you with diet recommendations, stress management, sleep tips, and so much more. What would you like to chat about today?`,
-              sender: 'bot',
-              timestamp: new Date(),
-            }]);
+            // No previous conversation, show personalized onboarding message
+            setMessages([
+              {
+                id: 'welcome',
+                text: getOnboardingMessage(userProfile),
+                sender: 'bot',
+                timestamp: new Date(),
+              },
+            ]);
           }
         } else {
-          // New user, show welcome message
-          setMessages([{
-            id: '1',
-            text: `Hi there! 👋 I'm Auvra, your personal health coach, and I'm here to support you on your wellness journey. I can help you with diet recommendations, stress management, sleep tips, and so much more. What would you like to chat about today?`,
-            sender: 'bot',
-            timestamp: new Date(),
-          }]);
+          // New user, show personalized onboarding message
+          setMessages([
+            {
+              id: 'welcome',
+              text: getOnboardingMessage(userProfile),
+              sender: 'bot',
+              timestamp: new Date(),
+            },
+          ]);
         }
       } catch (error) {
         console.error('Error loading conversation history:', error);
-        // Fallback to welcome message
-        setMessages([{
-          id: '1',
-          text: `Hi there! 👋 I'm Auvra, your personal health coach, and I'm here to support you on your wellness journey. I can help you with diet recommendations, stress management, sleep tips, and so much more. What would you like to chat about today?`,
-          sender: 'bot',
-          timestamp: new Date(),
-        }]);
+        // Fallback to personalized onboarding message
+        setMessages([
+          {
+            id: 'welcome',
+            text: getOnboardingMessage(userProfile),
+            sender: 'bot',
+            timestamp: new Date(),
+          },
+        ]);
       } finally {
         setIsLoadingHistory(false);
       }
     };
 
     loadConversationHistory();
-  }, [user?.uid]);
+  }, [user?.uid, userProfile]);
 
   // Save conversation to Firebase
   const saveConversationToFirebase = async (newMessages: Message[]) => {
@@ -902,14 +922,15 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
         conversationHistory: [],
         lastConversationUpdate: Timestamp.now()
       });
-      
-      // Reset to welcome message
-      setMessages([{
-        id: '1',
-        text: `Hi there! 👋 I'm Auvra, your personal health coach, and I'm here to support you on your wellness journey. I can help you with diet recommendations, stress management, sleep tips, and so much more. What would you like to chat about today?`,
-        sender: 'bot',
-        timestamp: new Date(),
-      }]);
+      // Reset to personalized onboarding message
+      setMessages([
+        {
+          id: 'welcome',
+          text: getOnboardingMessage(userProfile),
+          sender: 'bot',
+          timestamp: new Date(),
+        },
+      ]);
     } catch (error) {
       console.error('Error clearing conversation history:', error);
     }
