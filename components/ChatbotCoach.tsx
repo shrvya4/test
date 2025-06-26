@@ -42,11 +42,6 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
 
-  // Voice output state
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const synthRef = useRef(window.speechSynthesis);
-  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
-
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -664,36 +659,6 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
     return summary;
   };
 
-  // Helper: Speak text with calm female voice
-  const speakText = (text: string) => {
-    if (!window.speechSynthesis) return;
-    // Cancel any ongoing speech
-    window.speechSynthesis.cancel();
-    const utter = new window.SpeechSynthesisUtterance(text);
-    // Find a calm female voice
-    const voices = window.speechSynthesis.getVoices();
-    let voice = voices.find(v => v.name.includes('Google UK Female')) || voices.find(v => v.name.toLowerCase().includes('female')) || voices[0];
-    if (voice) utter.voice = voice;
-    utter.rate = 0.85;
-    utter.pitch = 1.1;
-    utter.volume = 1.0;
-    utter.onstart = () => setIsSpeaking(true);
-    utter.onend = () => setIsSpeaking(false);
-    utter.onerror = () => setIsSpeaking(false);
-    utteranceRef.current = utter;
-    window.speechSynthesis.speak(utter);
-  };
-
-  // Speak bot messages when they appear
-  useEffect(() => {
-    if (messages.length === 0) return;
-    const lastMsg = messages[messages.length - 1];
-    if (lastMsg.sender === 'bot') {
-      speakText(lastMsg.text.replace(/\*\*|•/g, ''));
-    }
-    // eslint-disable-next-line
-  }, [messages]);
-
   return (
     <div className="flex flex-col h-[700px] bg-white rounded-2xl border border-primary-100 shadow-lg overflow-hidden">
       {/* Chat Header */}
@@ -842,56 +807,6 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
             Powered by Smart AI
           </div>
         )}
-      </div>
-
-      {/* Floating chatbot avatar button */}
-      <div style={{ position: 'fixed', bottom: 32, right: 32, zIndex: 50 }}>
-        <div
-          className="shadow-lg flex items-center justify-center"
-          style={{
-            width: 64,
-            height: 64,
-            borderRadius: '50%',
-            background: isSpeaking ? 'linear-gradient(135deg, #E6A8D7 60%, #D8BFD8 100%)' : '#E6A8D7',
-            boxShadow: isSpeaking ? '0 0 24px #E6A8D7' : '0 2px 8px #E6A8D7',
-            transition: 'background 0.5s ease-in-out, box-shadow 0.5s',
-            cursor: 'pointer',
-            border: '3px solid #fff',
-            outline: isSpeaking ? '2px solid #D8BFD8' : 'none',
-            outlineOffset: '2px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            position: 'relative',
-            animation: isSpeaking ? 'pulse 2s infinite ease-in-out' : 'none',
-          }}
-          title="Auvra - Calm Voice Buddy"
-        >
-          {/* Animated waveform */}
-          <svg
-            width="40"
-            height="40"
-            viewBox="0 0 40 40"
-            style={{ position: 'absolute', left: 12, top: 12, opacity: isSpeaking ? 1 : 0.3, transition: 'opacity 0.5s' }}
-          >
-            <path
-              d="M2 20 Q8 10 14 20 T26 20 T38 20"
-              fill="none"
-              stroke="#fff"
-              strokeWidth="2"
-            >
-              <animate
-                attributeName="d"
-                dur="2s"
-                repeatCount="indefinite"
-                values="M2 20 Q8 10 14 20 T26 20 T38 20;M2 20 Q8 18 14 20 T26 22 T38 20;M2 20 Q8 10 14 20 T26 20 T38 20"
-                keyTimes="0;0.5;1"
-              />
-            </path>
-          </svg>
-          {/* Bot icon */}
-          <Bot className="w-8 h-8 text-white relative z-10" />
-        </div>
       </div>
     </div>
   );
