@@ -492,19 +492,19 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
             suggestions = [
               'Eat a handful of soaked sesame seeds in the morning.',
               'Add leafy greens like spinach or kale to one meal.',
-              'Drink a cup of spearmint tea in the afternoon.',
+              'Drink a cup of spearmint tea in the afternoon.'
             ];
           } else if (picked === 'exercise') {
             suggestions = [
               'Take a 10-minute brisk walk after lunch.',
               'Do 5 minutes of gentle yoga stretches.',
-              'Try 10 bodyweight squats or lunges.',
+              'Try 10 bodyweight squats or lunges.'
             ];
           } else if (picked === 'mindfulness') {
             suggestions = [
               'Try 5 minutes of deep breathing.',
               'Write down 3 things you're grateful for.',
-              'Do a short guided meditation before bed.',
+              'Do a short guided meditation before bed.'
             ];
           }
         } else if (mainGoal.includes('clearer skin')) {
