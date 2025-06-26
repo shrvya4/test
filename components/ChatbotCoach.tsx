@@ -6,6 +6,7 @@ import { Send, Bot, User, Sparkles, RotateCcw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { doc, getDoc, setDoc, updateDoc, arrayUnion, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { differenceInDays, isSameDay, parseISO } from 'date-fns';
 
 interface Message {
   id: string;
@@ -69,12 +70,20 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
         if (userDoc.exists()) {
           const userData = userDoc.data();
           if (userData.conversationHistory && userData.conversationHistory.length > 0) {
-            // Convert Firestore timestamps back to Date objects
-            const loadedMessages = userData.conversationHistory.map((msg: any) => ({
-              ...msg,
-              timestamp: msg.timestamp instanceof Timestamp ? msg.timestamp.toDate() : new Date(msg.timestamp)
-            }));
-            setMessages(loadedMessages);
+            // Only keep messages from the last 30 days
+            const now = new Date();
+            const loadedMessages = userData.conversationHistory
+              .map((msg: any) => ({
+                ...msg,
+                timestamp: msg.timestamp instanceof Timestamp ? msg.timestamp.toDate() : new Date(msg.timestamp)
+              }))
+              .filter((msg: any) => differenceInDays(now, msg.timestamp) <= 30);
+            setMessages(loadedMessages.length > 0 ? loadedMessages : [{
+              id: '1',
+              text: `Hi there! 👋 I'm Auvra, your personal health coach, and I'm here to support you on your wellness journey. I can help you with diet recommendations, stress management, sleep tips, and so much more. What would you like to chat about today?`,
+              sender: 'bot',
+              timestamp: new Date(),
+            }]);
           } else {
             // No previous conversation, show welcome message
             setMessages([{
@@ -180,11 +189,11 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
     } catch (error) {
       console.error('Error calling ChatGPT API:', error);
       // Fallback to local responses if API fails
-      return generateLocalResponse(userMessage);
+      return generateLocalResponse(userMessage, userProfile);
     }
   };
 
-  const generateLocalResponse = (userMessage: string): string => {
+  const generateLocalResponse = (userMessage: string, userProfile: any, getRecentUpdateNote?: (field: string) => string): string => {
     const lowerMessage = userMessage.toLowerCase();
     
     // Personalized responses based on user profile
@@ -222,10 +231,11 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
 
       // Sleep advice
       if (lowerMessage.includes('sleep') || lowerMessage.includes('insomnia') || lowerMessage.includes('tired')) {
+        const updateNote = getRecentUpdateNote ? getRecentUpdateNote('sleepQuality') : '';
         if (sleepQuality === 'Poor' || sleepQuality === 'Fair') {
-          return `I see you're struggling with sleep quality. Let's work on improving it:\n\n🌙 **Sleep Hygiene Tips:**\n• Go to bed and wake up at the same time daily\n• Create a relaxing bedtime routine\n• Keep your bedroom cool and dark\n• Avoid screens 1 hour before bed\n\n🍵 **Natural Sleep Aids:**\n• Chamomile tea\n• Lavender essential oil\n• Magnesium supplements\n• Warm bath before bed\n\n📱 **Digital Detox:**\n• Use night mode on devices\n• Keep phones away from bed\n• Try reading instead of scrolling\n\nWould you like a personalized bedtime routine?`;
+          return `${updateNote}I see you're struggling with sleep quality. Let's work on improving it:\n\n🌙 **Sleep Hygiene Tips:**\n• Go to bed and wake up at the same time daily\n• Create a relaxing bedtime routine\n• Keep your bedroom cool and dark\n• Avoid screens 1 hour before bed\n\n🍵 **Natural Sleep Aids:**\n• Chamomile tea\n• Lavender essential oil\n• Magnesium supplements\n• Warm bath before bed\n\n📱 **Digital Detox:**\n• Use night mode on devices\n• Keep phones away from bed\n• Try reading instead of scrolling\n\nWould you like a personalized bedtime routine?`;
         }
-        return `Great sleep is essential for hormonal balance! Here are some tips to maintain or improve your sleep quality:\n\n🌙 **Optimal Sleep Environment:**\n• Keep room temperature between 65-68°F\n• Use blackout curtains\n• White noise machine if needed\n• Comfortable, supportive mattress\n\n📱 **Technology Boundaries:**\n• No screens 1 hour before bed\n• Use blue light filters\n• Keep devices in another room\n\n🧘 **Relaxation Techniques:**\n• Gentle stretching\n• Meditation or deep breathing\n• Reading a book\n• Warm bath or shower\n\nHow's your current sleep routine?`;
+        return `${updateNote}Great sleep is essential for hormonal balance! Here are some tips to maintain or improve your sleep quality:\n\n🌙 **Optimal Sleep Environment:**\n• Keep room temperature between 65-68°F\n• Use blackout curtains\n• White noise machine if needed\n• Comfortable, supportive mattress\n\n📱 **Technology Boundaries:**\n• No screens 1 hour before bed\n• Use blue light filters\n• Keep devices in another room\n\n🧘 **Relaxation Techniques:**\n• Gentle stretching\n• Meditation or deep breathing\n• Reading a book\n• Warm bath or shower\n\nHow's your current sleep routine?`;
       }
 
       // Period tracking and cycle syncing
@@ -262,6 +272,77 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
     return `That's an interesting question! I'd love to help you with that. Could you tell me a bit more about what you're looking for? I can help with diet, exercise, stress management, sleep, hormonal health, and more. What specific area would you like to focus on?`;
   };
 
+  // Helper: Parse update intent from user message
+  const parseProfileUpdate = (message: string) => {
+    // Period date update
+    const periodMatch = message.match(/(update|set|change) (my )?(period|last period|period date) (to|as|on)?\s*([\w\-\/]+|today|yesterday)/i);
+    if (periodMatch) {
+      let dateStr = periodMatch[5]?.trim().toLowerCase();
+      let newDate: Date | null = null;
+      if (dateStr === 'today') newDate = new Date();
+      else if (dateStr === 'yesterday') {
+        newDate = new Date();
+        newDate.setDate(newDate.getDate() - 1);
+      } else {
+        // Try parsing as date
+        newDate = new Date(dateStr);
+        if (isNaN(newDate.getTime())) newDate = null;
+      }
+      if (newDate) return { field: 'lastPeriod', value: newDate.toISOString() };
+    }
+    // Sleep quality update
+    const sleepMatch = message.match(/(update|set|change) (my )?(sleep quality|sleep) (to|as)?\s*(poor|fair|good|excellent)/i);
+    if (sleepMatch) {
+      return { field: 'sleepQuality', value: sleepMatch[5][0].toUpperCase() + sleepMatch[5].slice(1).toLowerCase() };
+    }
+    // Stress level update
+    const stressMatch = message.match(/(update|set|change) (my )?(stress level|stress) (to|as)?\s*(low|medium|high)/i);
+    if (stressMatch) {
+      return { field: 'stressLevel', value: stressMatch[5][0].toUpperCase() + stressMatch[5].slice(1).toLowerCase() };
+    }
+    // Cycle length update
+    const cycleMatch = message.match(/(update|set|change) (my )?(cycle length|cycle) (to|as)?\s*(\d{2})/i);
+    if (cycleMatch) {
+      return { field: 'cycleLength', value: Number(cycleMatch[5]) };
+    }
+    // Period duration update
+    const durationMatch = message.match(/(update|set|change) (my )?(period duration|period length|duration) (to|as)?\s*(\d{1,2})/i);
+    if (durationMatch) {
+      return { field: 'periodDuration', value: Number(durationMatch[5]) };
+    }
+    return null;
+  };
+
+  // Helper: Fetch profile updates from Firestore for the last 30 days
+  const fetchRecentProfileUpdates = async (userId: string) => {
+    try {
+      const userRef = doc(db, 'users', userId);
+      const userDoc = await getDoc(userRef);
+      if (!userDoc.exists()) return [];
+      const data = userDoc.data();
+      if (!data.profileUpdates) return [];
+      const now = new Date();
+      return data.profileUpdates
+        .map((u: any) => ({
+          ...u,
+          timestamp: u.timestamp instanceof Timestamp ? u.timestamp.toDate() : new Date(u.timestamp)
+        }))
+        .filter((u: any) => differenceInDays(now, u.timestamp) <= 30);
+    } catch (err) {
+      return [];
+    }
+  };
+
+  // Helper: Summarize profile updates
+  const summarizeProfileUpdates = (updates: any[]) => {
+    if (!updates.length) return '';
+    let summary = 'Profile changes in the last 30 days:\n';
+    updates.forEach(u => {
+      summary += `• ${u.field.replace(/([A-Z])/g, ' $1').toLowerCase()} updated to ${typeof u.value === 'boolean' ? (u.value ? 'Yes' : 'No') : u.value} on ${u.timestamp.toLocaleDateString()}\n`;
+    });
+    return summary;
+  };
+
   const handleSendMessage = async () => {
     if (!inputMessage.trim()) return;
 
@@ -277,6 +358,127 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
     setInputMessage('');
     setIsTyping(true);
     setIsUsingAI(true);
+
+    if (/yesterday|previous day|last night/i.test(inputMessage)) {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const summary = summarizeDayConversation(messages, yesterday);
+      const botMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        text: summary,
+        sender: 'bot',
+        timestamp: new Date(),
+      };
+      const finalMessages = [...messages, userMessage, botMessage];
+      setMessages(finalMessages);
+      await saveConversationToFirebase(finalMessages);
+      setIsTyping(false);
+      setIsUsingAI(false);
+      setInputMessage('');
+      return;
+    }
+
+    if (/summar(y|ise)|what have we discussed|last 30 days|this month|last week/i.test(inputMessage)) {
+      let days = 30;
+      if (/last week|this week/i.test(inputMessage)) days = 7;
+      const now = new Date();
+      const startDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+      const recentMessages = messages.filter(msg => msg.timestamp >= startDate);
+      let chatSummary = `Here's a summary of your conversation in the last ${days} days:\n`;
+      recentMessages.forEach(msg => {
+        if (msg.sender === 'user') chatSummary += `• You: ${msg.text}\n`;
+        else chatSummary += `• Auvra: ${msg.text.substring(0, 80)}...\n`;
+      });
+      let profileSummary = '';
+      if (user?.uid) {
+        const updates = await fetchRecentProfileUpdates(user.uid);
+        profileSummary = summarizeProfileUpdates(updates);
+      }
+      const botMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        text: `${chatSummary}\n${profileSummary}`.trim(),
+        sender: 'bot',
+        timestamp: new Date(),
+      };
+      const finalMessages = [...messages, userMessage, botMessage];
+      setMessages(finalMessages);
+      await saveConversationToFirebase(finalMessages);
+      setIsTyping(false);
+      setIsUsingAI(false);
+      setInputMessage('');
+      return;
+    }
+
+    const updateIntent = parseProfileUpdate(inputMessage);
+    if (updateIntent && user && userProfile) {
+      // Update Firestore and in-memory profile
+      const updatedProfile = { ...userProfile, [updateIntent.field]: updateIntent.value };
+      try {
+        const userRef = doc(db, 'users', user.uid);
+        await updateDoc(userRef, {
+          [updateIntent.field]: updateIntent.value,
+          updatedAt: Timestamp.now(),
+          profileUpdates: arrayUnion({
+            field: updateIntent.field,
+            value: updateIntent.value,
+            timestamp: Timestamp.now(),
+          })
+        });
+        setMessages(prev => [
+          ...prev,
+          {
+            id: (Date.now() + 2).toString(),
+            text: `Your ${updateIntent.field.replace(/([A-Z])/g, ' $1').toLowerCase()} has been updated to ${typeof updateIntent.value === 'boolean' ? (updateIntent.value ? 'Yes' : 'No') : updateIntent.value}.`,
+            sender: 'bot',
+            timestamp: new Date(),
+          },
+        ]);
+        await saveConversationToFirebase([
+          ...messages,
+          userMessage,
+          {
+            id: (Date.now() + 2).toString(),
+            text: `Your ${updateIntent.field.replace(/([A-Z])/g, ' $1').toLowerCase()} has been updated to ${typeof updateIntent.value === 'boolean' ? (updateIntent.value ? 'Yes' : 'No') : updateIntent.value}.`,
+            sender: 'bot',
+            timestamp: new Date(),
+          },
+        ]);
+        setIsTyping(false);
+        setIsUsingAI(false);
+        setInputMessage('');
+        // Optionally update in-memory profile if you keep it in state
+        // setUserProfile(updatedProfile);
+        return;
+      } catch (err) {
+        setMessages(prev => [
+          ...prev,
+          {
+            id: (Date.now() + 2).toString(),
+            text: `Sorry, I couldn't update your ${updateIntent.field.replace(/([A-Z])/g, ' $1').toLowerCase()} right now. Please try again later!`,
+            sender: 'bot',
+            timestamp: new Date(),
+          },
+        ]);
+        setIsTyping(false);
+        setIsUsingAI(false);
+        setInputMessage('');
+        return;
+      }
+    }
+
+    let recentProfileUpdates: any[] = [];
+    let getRecentUpdateNote = (field: string) => '';
+    if (user?.uid) {
+      recentProfileUpdates = await fetchRecentProfileUpdates(user.uid);
+      getRecentUpdateNote = (field: string) => {
+        const update = recentProfileUpdates.find(u => u.field === field && differenceInDays(new Date(), u.timestamp) <= 7);
+        if (update) {
+          return `You recently updated your ${field.replace(/([A-Z])/g, ' $1').toLowerCase()} to ${typeof update.value === 'boolean' ? (update.value ? 'Yes' : 'No') : update.value} on ${update.timestamp.toLocaleDateString()}.
+`;
+        }
+        return '';
+      };
+    }
 
     try {
       const botResponse = await generateChatGPTResponse(inputMessage);
@@ -295,7 +497,7 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
     } catch (error) {
       console.error('Error getting response:', error);
       // Fallback to local response
-      const fallbackResponse = generateLocalResponse(inputMessage);
+      const fallbackResponse = generateLocalResponse(inputMessage, userProfile, getRecentUpdateNote);
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
         text: fallbackResponse,
@@ -392,6 +594,28 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
     } catch (error) {
       console.error('Error clearing conversation history:', error);
     }
+  };
+
+  // Helper to get messages from a specific day
+  const getMessagesForDay = (messages: Message[], date: Date) => {
+    return messages.filter(msg => isSameDay(msg.timestamp, date));
+  };
+
+  // Helper to summarize a day's conversation
+  const summarizeDayConversation = (messages: Message[], date: Date) => {
+    const dayMessages = getMessagesForDay(messages, date);
+    if (dayMessages.length === 0) {
+      return `No conversation found for ${date.toLocaleDateString()}.`;
+    }
+    let summary = `Here's a summary of your conversation on ${date.toLocaleDateString()}:\n`;
+    dayMessages.forEach(msg => {
+      if (msg.sender === 'user') {
+        summary += `• You asked: ${msg.text}\n`;
+      } else {
+        summary += `• Auvra replied: ${msg.text.substring(0, 80)}...\n`;
+      }
+    });
+    return summary;
   };
 
   return (
