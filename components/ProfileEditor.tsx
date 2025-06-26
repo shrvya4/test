@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { motion, AnimatePresence } from 'framer-motion';
 import DatePicker from 'react-datepicker';
@@ -58,33 +58,22 @@ export default function ProfileEditor() {
   const sleepQualities = ['Poor', 'Fair', 'Good', 'Excellent'];
 
   useEffect(() => {
-    fetchProfile();
-  }, [user]);
-
-  const fetchProfile = async () => {
     if (!user) return;
-    
     setLoading(true);
-    try {
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
+    const unsub = onSnapshot(doc(db, 'users', user.uid), (userDoc) => {
       if (userDoc.exists()) {
         const data = userDoc.data() as any;
-        
-        // Convert lastPeriod string to Date object if it exists
         let lastPeriodDate = new Date();
         if (data.lastPeriod) {
           try {
             lastPeriodDate = new Date(data.lastPeriod);
-            // Check if the date is valid
             if (isNaN(lastPeriodDate.getTime())) {
               lastPeriodDate = new Date();
             }
           } catch (error) {
-            console.error('Error parsing lastPeriod date:', error);
             lastPeriodDate = new Date();
           }
         }
-
         const processedData: UserProfile = {
           ...data,
           lastPeriod: lastPeriodDate,
@@ -96,16 +85,13 @@ export default function ProfileEditor() {
           stressLevel: data.stressLevel || '',
           sleepQuality: data.sleepQuality || '',
         };
-
         setProfile(processedData);
         setFormData(processedData);
       }
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-    } finally {
       setLoading(false);
-    }
-  };
+    });
+    return () => unsub();
+  }, [user]);
 
   const handleInputChange = (field: keyof UserProfile, value: any) => {
     setFormData(prev => ({
