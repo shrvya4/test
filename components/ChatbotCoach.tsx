@@ -372,9 +372,275 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
     return summary;
   };
 
+  // Helper: Map symptoms/concerns to positive goals
+  const concernToGoal = {
+    'acne': 'clearer skin',
+    'irregular periods': 'regulating your periods',
+    'fatigue': 'more energy',
+    'weight gain': 'sustainable weight management',
+    'anxiety': 'feeling more balanced',
+    'hair fall': 'stronger hair',
+    'mood swings': 'emotional balance',
+    'other': 'better wellbeing',
+  };
+
+  const getUserGoals = (userProfile: any) => {
+    if (!userProfile) return [];
+    const goals = [];
+    if (userProfile.symptoms && userProfile.symptoms.length) {
+      for (const s of userProfile.symptoms) {
+        const key = s.toLowerCase();
+        if (concernToGoal[key] && !goals.includes(concernToGoal[key])) goals.push(concernToGoal[key]);
+      }
+    }
+    // Fallback: use diagnosis
+    if (goals.length === 0 && userProfile.diagnosis && userProfile.diagnosis.length) {
+      for (const d of userProfile.diagnosis) {
+        const key = d.toLowerCase();
+        if (concernToGoal[key] && !goals.includes(concernToGoal[key])) goals.push(concernToGoal[key]);
+      }
+    }
+    // Fallback: generic
+    if (goals.length === 0) goals.push('better wellbeing');
+    return goals.slice(0, 2);
+  };
+
+  // Chatbot state for onboarding flow
+  const [goalFlowStep, setGoalFlowStep] = useState(0); // 0 = not started, 1 = asked how many, 2 = asked category, 3 = suggested actions
+  const [goalFlowNum, setGoalFlowNum] = useState<number | null>(null);
+  const [goalFlowCategory, setGoalFlowCategory] = useState<string | null>(null);
+
+  // On new session, start the goal flow
+  useEffect(() => {
+    if (messages.length === 0 && userProfile) {
+      const goals = getUserGoals(userProfile);
+      const goalMsg = goals.length === 1
+        ? `Hi, I'm here to support you in ${goals[0]}. 🌸 Let's make today simple and doable.`
+        : `Hi, I'm here to support you in ${goals.map(g => `*${g}*`).join(' and ')}. 🌸 Let's make today simple and doable.`;
+      setMessages([
+        {
+          id: 'welcome',
+          text: goalMsg,
+          sender: 'bot',
+          timestamp: new Date(),
+        },
+        {
+          id: 'howmany',
+          text: 'How many small actions would you like to take today to move toward your goal? You can pick 1, 2 or 3 — whatever feels easiest for you right now.',
+          sender: 'bot',
+          timestamp: new Date(),
+        },
+      ]);
+      setGoalFlowStep(1);
+    }
+    // eslint-disable-next-line
+  }, [userProfile]);
+
+  // Handle onboarding flow in handleSendMessage
   const handleSendMessage = async () => {
     if (!inputMessage.trim()) return;
 
+    // If in goal flow
+    if (goalFlowStep === 1) {
+      const num = parseInt(inputMessage.trim());
+      if ([1, 2, 3].includes(num)) {
+        setGoalFlowNum(num);
+        setMessages(prev => [
+          ...prev,
+          { id: Date.now().toString(), text: inputMessage, sender: 'user', timestamp: new Date() },
+          {
+            id: 'whicharea',
+            text: 'Great! Which area feels most doable today? 💪\n- Exercise\n- Diet\n- Mindfulness',
+            sender: 'bot',
+            timestamp: new Date(),
+          },
+        ]);
+        setGoalFlowStep(2);
+        setInputMessage('');
+        return;
+      } else {
+        setMessages(prev => [
+          ...prev,
+          { id: Date.now().toString(), text: inputMessage, sender: 'user', timestamp: new Date() },
+          {
+            id: 'howmanyagain',
+            text: 'Please type 1, 2, or 3 for how many small actions you want to take today.',
+            sender: 'bot',
+            timestamp: new Date(),
+          },
+        ]);
+        setInputMessage('');
+        return;
+      }
+    }
+    if (goalFlowStep === 2) {
+      const cat = inputMessage.trim().toLowerCase();
+      let picked: string | null = null;
+      if (cat.includes('exercise')) picked = 'exercise';
+      if (cat.includes('diet')) picked = 'diet';
+      if (cat.includes('mindfulness')) picked = 'mindfulness';
+      if (picked) {
+        setGoalFlowCategory(picked);
+        // Suggest actions next
+        const goals = getUserGoals(userProfile);
+        const mainGoal = goals[0] || 'better wellbeing';
+        const num = goalFlowNum || 1;
+        // Generate suggestions
+        let suggestions: string[] = [];
+        if (mainGoal.includes('regulating')) {
+          if (picked === 'diet') {
+            suggestions = [
+              'Eat a handful of soaked sesame seeds in the morning.',
+              'Add leafy greens like spinach or kale to one meal.',
+              'Drink a cup of spearmint tea in the afternoon.',
+            ];
+          } else if (picked === 'exercise') {
+            suggestions = [
+              'Take a 10-minute brisk walk after lunch.',
+              'Do 5 minutes of gentle yoga stretches.',
+              'Try 10 bodyweight squats or lunges.',
+            ];
+          } else if (picked === 'mindfulness') {
+            suggestions = [
+              'Try 5 minutes of deep breathing.',
+              'Write down 3 things you're grateful for.',
+              'Do a short guided meditation before bed.',
+            ];
+          }
+        } else if (mainGoal.includes('clearer skin')) {
+          if (picked === 'diet') {
+            suggestions = [
+              'Drink 2 extra glasses of water today.',
+              'Eat a serving of berries or citrus fruit.',
+              'Avoid sugary snacks for one meal.',
+            ];
+          } else if (picked === 'exercise') {
+            suggestions = [
+              'Do 10 minutes of light cardio (like dancing or walking).',
+              'Try a gentle face massage after cleansing.',
+              'Do 10 jumping jacks to get your blood flowing.',
+            ];
+          } else if (picked === 'mindfulness') {
+            suggestions = [
+              'Try 5 minutes of deep breathing or a short guided meditation.',
+              'Take 3 slow, mindful breaths before each meal.',
+              'Write down one thing you love about your skin.',
+            ];
+          }
+        } else if (mainGoal.includes('energy')) {
+          if (picked === 'diet') {
+            suggestions = [
+              'Eat a protein-rich snack (like nuts or yogurt).',
+              'Have a piece of fruit for a natural energy boost.',
+              'Drink a glass of water first thing in the morning.',
+            ];
+          } else if (picked === 'exercise') {
+            suggestions = [
+              'Do 10 jumping jacks to wake up your body.',
+              'Take a 5-minute walk outside.',
+              'Stretch your arms and legs for 2 minutes.',
+            ];
+          } else if (picked === 'mindfulness') {
+            suggestions = [
+              'Take 3 deep breaths when you feel tired.',
+              'Stand up and stretch every hour.',
+              'Listen to a favorite song and move gently.',
+            ];
+          }
+        } else if (mainGoal.includes('weight')) {
+          if (picked === 'diet') {
+            suggestions = [
+              'Swap one sugary drink for water today.',
+              'Add a serving of vegetables to your lunch or dinner.',
+              'Eat slowly and mindfully at one meal.',
+            ];
+          } else if (picked === 'exercise') {
+            suggestions = [
+              'Take the stairs instead of the elevator once today.',
+              'Do 10 squats or lunges.',
+              'Go for a 10-minute walk after dinner.',
+            ];
+          } else if (picked === 'mindfulness') {
+            suggestions = [
+              'Pause and check in with your hunger before eating.',
+              'Write down one thing you appreciate about your body.',
+              'Take 3 deep breaths before your next meal.',
+            ];
+          }
+        } else if (mainGoal.includes('balanced')) {
+          if (picked === 'diet') {
+            suggestions = [
+              'Eat a meal without distractions (no phone or TV).',
+              'Try a calming herbal tea like chamomile.',
+              'Include a source of healthy fat (like avocado or nuts) in a meal.',
+            ];
+          } else if (picked === 'exercise') {
+            suggestions = [
+              'Do 5 minutes of gentle stretching.',
+              'Take a mindful walk, focusing on your breath.',
+              'Try a short yoga or tai chi video.',
+            ];
+          } else if (picked === 'mindfulness') {
+            suggestions = [
+              'Try a 3-minute body scan meditation.',
+              'Write down one thing you're grateful for today.',
+              'Take 3 slow breaths before responding to stress.',
+            ];
+          }
+        } else {
+          // Generic suggestions
+          if (picked === 'diet') {
+            suggestions = [
+              'Drink a glass of water.',
+              'Eat a piece of fruit.',
+              'Add a handful of greens to a meal.',
+            ];
+          } else if (picked === 'exercise') {
+            suggestions = [
+              'Take a short walk.',
+              'Do 5 minutes of stretching.',
+              'Try 10 jumping jacks.',
+            ];
+          } else if (picked === 'mindfulness') {
+            suggestions = [
+              'Take 3 deep breaths.',
+              'Write down one thing you're grateful for.',
+              'Pause and notice your surroundings for 1 minute.',
+            ];
+          }
+        }
+        const chosen = suggestions.slice(0, goalFlowNum || 1);
+        setMessages(prev => [
+          ...prev,
+          { id: Date.now().toString(), text: inputMessage, sender: 'user', timestamp: new Date() },
+          {
+            id: 'suggestions',
+            text: `Here ${chosen.length === 1 ? 'is' : 'are'} ${chosen.length} small ${picked} step${chosen.length > 1 ? 's' : ''} you can try today:\n` +
+              chosen.map((s, i) => `${i + 1}. ${s}`).join('\n'),
+            sender: 'bot',
+            timestamp: new Date(),
+          },
+        ]);
+        setGoalFlowStep(3);
+        setInputMessage('');
+        return;
+      } else {
+        setMessages(prev => [
+          ...prev,
+          { id: Date.now().toString(), text: inputMessage, sender: 'user', timestamp: new Date() },
+          {
+            id: 'whichareaagain',
+            text: 'Please type Exercise, Diet, or Mindfulness to pick an area.',
+            sender: 'bot',
+            timestamp: new Date(),
+          },
+        ]);
+        setInputMessage('');
+        return;
+      }
+    }
+
+    // After onboarding flow, continue with normal chat
     const userMessage: Message = {
       id: Date.now().toString(),
       text: inputMessage,
@@ -530,7 +796,7 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
         timestamp: new Date(),
       };
       
-      const finalMessages = [...updatedMessages, botMessage];
+      const finalMessages = [...messages, userMessage, botMessage];
       setMessages(finalMessages);
       
       // Save the complete conversation to Firebase
@@ -546,7 +812,7 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
         timestamp: new Date(),
       };
       
-      const finalMessages = [...updatedMessages, botMessage];
+      const finalMessages = [...messages, userMessage, botMessage];
       setMessages(finalMessages);
       
       // Save the complete conversation to Firebase even for fallback responses
