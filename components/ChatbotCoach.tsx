@@ -413,21 +413,36 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
 
   // On new session, start the goal flow
   useEffect(() => {
-    if (messages.length === 0 && userProfile) {
+    if (userProfile) {
       const username = userProfile.name || userProfile.age || 'there';
       const goals = getUserGoals(userProfile);
       const goalList = goals.length === 1
         ? goals[0]
         : goals.slice(0, -1).join(', ') + (goals.length > 1 ? ' and ' + goals[goals.length - 1] : '');
       const goalMsg = `Hi ${username}, I'm Auvra, your hormone buddy, I'm here to support you in ${goalList}. How many self-care actions you want to take today?`;
-      setMessages([
-        {
-          id: 'welcome',
-          text: goalMsg,
-          sender: 'bot',
-          timestamp: new Date(),
-        },
-      ]);
+      setMessages(prevMessages => {
+        // If the onboarding message is already present at the top, do nothing
+        if (prevMessages.length > 0 && prevMessages[0].id === 'welcome') {
+          // If the text has changed (profile updated), update it
+          if (prevMessages[0].text !== goalMsg) {
+            return [
+              { ...prevMessages[0], text: goalMsg },
+              ...prevMessages.slice(1)
+            ];
+          }
+          return prevMessages;
+        }
+        // Otherwise, prepend the onboarding message
+        return [
+          {
+            id: 'welcome',
+            text: goalMsg,
+            sender: 'bot',
+            timestamp: new Date(),
+          },
+          ...prevMessages
+        ];
+      });
       setGoalFlowStep(1);
     }
     // eslint-disable-next-line
