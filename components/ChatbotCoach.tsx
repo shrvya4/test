@@ -101,18 +101,10 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
     } else if (goals.length > 2) {
       goalList = goals.slice(0, -1).join(', ') + ', and ' + goals[goals.length - 1];
     }
-    let supportPhrase = '';
-    if (goals.length === 1) {
-      supportPhrase = `in ${goalList}`;
-    } else if (goals.length > 1 && areAllNounPhrases(goals)) {
-      supportPhrase = `in achieving ${goalList}`;
-    } else if (goals.length > 1) {
-      supportPhrase = `in ${goalList}`;
-    }
     if (username) {
-      return `Hi ${username}, I'm Auvra, your hormone buddy. I'm here to support you ${supportPhrase}. How many self-care actions would you like to take today?`;
+      return `Hi ${username}! I'm Auvra, your own Hormone Buddy. Let's work together to ${goalList}. So how many actions would you like to get started with today?`;
     } else {
-      return `Hi, I'm Auvra, your hormone buddy. I'm here to support you ${supportPhrase}. How many self-care actions would you like to take today?`;
+      return `Hi! I'm Auvra, your own Hormone Buddy. Let's work together to ${goalList}. So how many actions would you like to get started with today?`;
     }
   };
 
@@ -504,7 +496,7 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
           { id: Date.now().toString(), text: inputMessage, sender: 'user', timestamp: new Date() },
           {
             id: 'whicharea',
-            text: 'Great! Which area feels most doable today? 💪\n- Exercise\n- Diet\n- Mindfulness',
+            text: 'Great! Which area feels most doable today? 💪\n- Food\n- Movement\n- Emotions',
             sender: 'bot',
             timestamp: new Date(),
           },
@@ -530,9 +522,9 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
     if (goalFlowStep === 2) {
       const cat = inputMessage.trim().toLowerCase();
       let picked: string | null = null;
-      if (cat.includes('exercise')) picked = 'exercise';
-      if (cat.includes('diet')) picked = 'diet';
-      if (cat.includes('mindfulness')) picked = 'mindfulness';
+      if (cat.includes('food')) picked = 'food';
+      if (cat.includes('movement')) picked = 'movement';
+      if (cat.includes('emotions')) picked = 'emotions';
       if (picked) {
         setGoalFlowCategory(picked);
         // Suggest actions next
@@ -542,19 +534,19 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
         // Generate suggestions
         let suggestions: string[] = [];
         if (mainGoal.includes('regulating')) {
-          if (picked === 'diet') {
+          if (picked === 'food') {
             suggestions = [
               'Eat a handful of soaked sesame seeds in the morning.',
               'Add leafy greens like spinach or kale to one meal.',
               'Drink a cup of spearmint tea in the afternoon.'
             ];
-          } else if (picked === 'exercise') {
+          } else if (picked === 'movement') {
             suggestions = [
               'Take a 10-minute brisk walk after lunch.',
               'Do 5 minutes of gentle yoga stretches.',
               'Try 10 bodyweight squats or lunges.'
             ];
-          } else if (picked === 'mindfulness') {
+          } else if (picked === 'emotions') {
             suggestions = [
               'Try 5 minutes of deep breathing.',
               'Write down 3 things you are grateful for today.',
@@ -562,19 +554,19 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
             ];
           }
         } else if (mainGoal.includes('clearer skin')) {
-          if (picked === 'diet') {
+          if (picked === 'food') {
             suggestions = [
               'Drink 2 extra glasses of water today.',
               'Eat a serving of berries or citrus fruit.',
               'Avoid sugary snacks for one meal.',
             ];
-          } else if (picked === 'exercise') {
+          } else if (picked === 'movement') {
             suggestions = [
               'Do 10 minutes of light cardio (like dancing or walking).',
               'Try a gentle face massage after cleansing.',
               'Do 10 jumping jacks to get your blood flowing.',
             ];
-          } else if (picked === 'mindfulness') {
+          } else if (picked === 'emotions') {
             suggestions = [
               'Try 5 minutes of deep breathing or a short guided meditation.',
               'Take 3 slow, mindful breaths before each meal.',
@@ -582,19 +574,19 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
             ];
           }
         } else if (mainGoal.includes('energy')) {
-          if (picked === 'diet') {
+          if (picked === 'food') {
             suggestions = [
               'Eat a protein-rich snack (like nuts or yogurt).',
               'Have a piece of fruit for a natural energy boost.',
               'Drink a glass of water first thing in the morning.',
             ];
-          } else if (picked === 'exercise') {
+          } else if (picked === 'movement') {
             suggestions = [
               'Do 10 jumping jacks to wake up your body.',
               'Take a 5-minute walk outside.',
               'Stretch your arms and legs for 2 minutes.',
             ];
-          } else if (picked === 'mindfulness') {
+          } else if (picked === 'emotions') {
             suggestions = [
               'Take 3 deep breaths when you feel tired.',
               'Stand up and stretch every hour.',
@@ -602,39 +594,39 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
             ];
           }
         } else if (mainGoal.includes('weight')) {
-          if (picked === 'diet') {
+          if (picked === 'food') {
             suggestions = [
               'Swap one sugary drink for water today.',
               'Add a serving of vegetables to your lunch or dinner.',
               'Eat slowly and mindfully at one meal.',
             ];
-          } else if (picked === 'exercise') {
+          } else if (picked === 'movement') {
             suggestions = [
               'Take the stairs instead of the elevator once today.',
               'Do 10 squats or lunges.',
               'Go for a 10-minute walk after dinner.',
             ];
-          } else if (picked === 'mindfulness') {
+          } else if (picked === 'emotions') {
             suggestions = [
               'Pause and check in with your hunger before eating.',
               'Write down one thing you appreciate about your body.',
               'Take 3 deep breaths before your next meal.',
             ];
           }
-        } else if (mainGoal.includes('balanced')) {
-          if (picked === 'diet') {
+        } else if (mainGoal.includes('balance')) {
+          if (picked === 'food') {
             suggestions = [
               'Eat a meal without distractions (no phone or TV).',
               'Try a calming herbal tea like chamomile.',
               'Include a source of healthy fat (like avocado or nuts) in a meal.',
             ];
-          } else if (picked === 'exercise') {
+          } else if (picked === 'movement') {
             suggestions = [
               'Do 5 minutes of gentle stretching.',
               'Take a mindful walk, focusing on your breath.',
               'Try a short yoga or tai chi video.',
             ];
-          } else if (picked === 'mindfulness') {
+          } else if (picked === 'emotions') {
             suggestions = [
               'Try a 3-minute body scan meditation.',
               'Write down one thing you are grateful for today.',
@@ -643,19 +635,19 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
           }
         } else {
           // Generic suggestions
-          if (picked === 'diet') {
+          if (picked === 'food') {
             suggestions = [
               'Drink a glass of water.',
               'Eat a piece of fruit.',
               'Add a handful of greens to a meal.',
             ];
-          } else if (picked === 'exercise') {
+          } else if (picked === 'movement') {
             suggestions = [
               'Take a short walk.',
               'Do 5 minutes of stretching.',
               'Try 10 jumping jacks.',
             ];
-          } else if (picked === 'mindfulness') {
+          } else if (picked === 'emotions') {
             suggestions = [
               'Take 3 deep breaths.',
               'Write down one thing you are grateful for.',
@@ -684,7 +676,7 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
           { id: Date.now().toString(), text: inputMessage, sender: 'user', timestamp: new Date() },
           {
             id: 'whichareaagain',
-            text: 'Please type Exercise, Diet, or Mindfulness to pick an area.',
+            text: 'Please type Food, Movement, or Emotions to pick an area.',
             sender: 'bot',
             timestamp: new Date(),
           },
