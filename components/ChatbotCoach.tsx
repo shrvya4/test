@@ -373,9 +373,9 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
   };
 
   // Helper: Map symptoms/concerns to positive goals
-  const concernToGoal = {
+  const concernToGoal: { [key: string]: string } = {
     'acne': 'clearer skin',
-    'irregular periods': 'regulating your periods',
+    'irregular periods': 'regulating your cycle',
     'fatigue': 'more energy',
     'weight gain': 'sustainable weight management',
     'anxiety': 'feeling more balanced',
@@ -384,19 +384,19 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
     'other': 'better wellbeing',
   };
 
-  const getUserGoals = (userProfile: any) => {
+  const getUserGoals = (userProfile: any): string[] => {
     if (!userProfile) return [];
-    const goals = [];
+    const goals: string[] = [];
     if (userProfile.symptoms && userProfile.symptoms.length) {
       for (const s of userProfile.symptoms) {
-        const key = s.toLowerCase();
+        const key = String(s).toLowerCase();
         if (concernToGoal[key] && !goals.includes(concernToGoal[key])) goals.push(concernToGoal[key]);
       }
     }
     // Fallback: use diagnosis
     if (goals.length === 0 && userProfile.diagnosis && userProfile.diagnosis.length) {
       for (const d of userProfile.diagnosis) {
-        const key = d.toLowerCase();
+        const key = String(d).toLowerCase();
         if (concernToGoal[key] && !goals.includes(concernToGoal[key])) goals.push(concernToGoal[key]);
       }
     }
@@ -503,7 +503,7 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
           } else if (picked === 'mindfulness') {
             suggestions = [
               'Try 5 minutes of deep breathing.',
-              'Write down 3 things you're grateful for.',
+              'Write down 3 things you are grateful for today.',
               'Do a short guided meditation before bed.'
             ];
           }
@@ -583,7 +583,7 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
           } else if (picked === 'mindfulness') {
             suggestions = [
               'Try a 3-minute body scan meditation.',
-              'Write down one thing you're grateful for today.',
+              'Write down one thing you are grateful for today.',
               'Take 3 slow breaths before responding to stress.',
             ];
           }
@@ -604,7 +604,7 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
           } else if (picked === 'mindfulness') {
             suggestions = [
               'Take 3 deep breaths.',
-              'Write down one thing you're grateful for.',
+              'Write down one thing you are grateful for.',
               'Pause and notice your surroundings for 1 minute.',
             ];
           }
