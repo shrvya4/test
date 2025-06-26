@@ -6,7 +6,7 @@ import { Send, Bot, User, Sparkles, RotateCcw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { doc, getDoc, setDoc, updateDoc, arrayUnion, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { differenceInDays, isSameDay, parseISO } from 'date-fns';
+import { differenceInDays, isSameDay, parseISO, parse, isValid } from 'date-fns';
 
 interface Message {
   id: string;
@@ -272,10 +272,41 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
     return `That's an interesting question! I'd love to help you with that. Could you tell me a bit more about what you're looking for? I can help with diet, exercise, stress management, sleep, hormonal health, and more. What specific area would you like to focus on?`;
   };
 
+  // Helper: Try to parse a date from various formats
+  const tryParseDate = (input: string): Date | null => {
+    const formats = [
+      'yyyy-MM-dd',
+      'dd/MM/yyyy',
+      'd/M/yyyy',
+      'MMMM d, yyyy',
+      'd MMMM yyyy',
+      'd MMM yyyy',
+      'MMM d, yyyy',
+      'd MMM, yyyy',
+      'd MMMM, yyyy',
+      'do MMMM yyyy',
+      'do MMM yyyy',
+      'd MMM',
+      'd MMMM',
+      'MMMM d',
+      'MMM d',
+      'd/M/yy',
+      'dd/MM/yy',
+    ];
+    for (const format of formats) {
+      const parsed = parse(input, format, new Date());
+      if (isValid(parsed)) return parsed;
+    }
+    // Fallback to Date constructor
+    const fallback = new Date(input);
+    if (isValid(fallback)) return fallback;
+    return null;
+  };
+
   // Helper: Parse update intent from user message
   const parseProfileUpdate = (message: string) => {
     // Period date update
-    const periodMatch = message.match(/(update|set|change) (my )?(period|last period|period date) (to|as|on)?\s*([\w\-\/]+|today|yesterday)/i);
+    const periodMatch = message.match(/(update|set|change) (my )?(period|last period|period date) (to|as|on)?\s*([\w\-\/\.,]+|today|yesterday)/i);
     if (periodMatch) {
       let dateStr = periodMatch[5]?.trim().toLowerCase();
       let newDate: Date | null = null;
@@ -284,9 +315,7 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
         newDate = new Date();
         newDate.setDate(newDate.getDate() - 1);
       } else {
-        // Try parsing as date
-        newDate = new Date(dateStr);
-        if (isNaN(newDate.getTime())) newDate = null;
+        newDate = tryParseDate(dateStr);
       }
       if (newDate) return { field: 'lastPeriod', value: newDate.toISOString() };
     }
