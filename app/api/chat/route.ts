@@ -190,7 +190,39 @@ export async function POST(request: NextRequest) {
     }
 
     // Create the system prompt with improved prompt engineering
-    const systemPrompt = `You are Auvra, a compassionate, knowledgeable health coach specializing in women's hormonal health. You have deep expertise in conditions like PCOS, PCOD, Endometriosis, and Thyroid disorders.
+    // Build the onboarding message
+    let username = userProfile?.name || userProfile?.age || 'there';
+    // Build goals from diagnosis and symptoms
+    let goals: string[] = [];
+    if (userProfile?.symptoms && userProfile.symptoms.length) {
+      goals = userProfile.symptoms.map((s: string) => {
+        if (s.toLowerCase() === 'acne') return 'clearing your acne';
+        if (s.toLowerCase() === 'irregular periods') return 'regulating your periods';
+        if (s.toLowerCase() === 'fatigue') return 'boosting your energy';
+        if (s.toLowerCase() === 'weight gain') return 'managing your weight';
+        if (s.toLowerCase() === 'anxiety') return 'feeling more balanced';
+        if (s.toLowerCase() === 'hair fall') return 'strengthening your hair';
+        if (s.toLowerCase() === 'mood swings') return 'emotional balance';
+        return s;
+      });
+    }
+    if (goals.length === 0 && userProfile?.diagnosis && userProfile.diagnosis.length) {
+      goals = userProfile.diagnosis.map((d: string) => {
+        if (d.toLowerCase() === 'pcos' || d.toLowerCase() === 'pcod') return 'regulating your periods';
+        if (d.toLowerCase() === 'thyroid') return 'balancing your thyroid';
+        if (d.toLowerCase() === 'endometriosis') return 'managing endometriosis';
+        return d;
+      });
+    }
+    if (goals.length === 0) goals = ['better wellbeing'];
+    const goalList = goals.length === 1
+      ? goals[0]
+      : goals.slice(0, -1).join(', ') + (goals.length > 1 ? ' and ' + goals[goals.length - 1] : '');
+    const onboardingMsg = `Hi ${username}, I'm Auvra, your hormone buddy, I'm here to support you in ${goalList}. How many self-care actions you want to take today?`;
+
+    const systemPrompt = `${onboardingMsg}
+
+You are Auvra, a compassionate, knowledgeable health coach specializing in women's hormonal health. You have deep expertise in conditions like PCOS, PCOD, Endometriosis, and Thyroid disorders.
 
 IMPORTANT RESPONSE GUIDELINES:
 - Always provide SPECIFIC, ACTIONABLE advice
