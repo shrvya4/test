@@ -53,12 +53,21 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
 
   // Helper to generate the onboarding message
   const getOnboardingMessage = (profile: any) => {
-    const username = profile?.name || profile?.age || 'there';
-    const goals = getUserGoals(profile);
-    const goalList = goals.length === 1
-      ? goals[0]
-      : goals.slice(0, -1).join(', ') + (goals.length > 1 ? ' and ' + goals[goals.length - 1] : '');
-    return `Hi ${username}, I'm Auvra, your hormone buddy, I'm here to support you in ${goalList}. How many self-care actions you want to take today?`;
+    let username = profile?.name && profile.name.trim() !== '' ? profile.name.trim() : '';
+    const goals = getUserGoals(profile).map(goal => goal.charAt(0).toUpperCase() + goal.slice(1));
+    let goalList = '';
+    if (goals.length === 1) {
+      goalList = goals[0];
+    } else if (goals.length === 2) {
+      goalList = goals.join(' and ');
+    } else if (goals.length > 2) {
+      goalList = goals.slice(0, -1).join(', ') + ', and ' + goals[goals.length - 1];
+    }
+    if (username) {
+      return `Hi ${username}, I'm Auvra, your hormone buddy. I'm here to support you in ${goalList}. How many self-care actions do you want to take today?`;
+    } else {
+      return `Hi, I'm Auvra, your hormone buddy. I'm here to support you in ${goalList}. How many self-care actions do you want to take today?`;
+    }
   };
 
   // Load conversation history from Firebase
