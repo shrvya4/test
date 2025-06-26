@@ -2,8 +2,10 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Bot, User, Sparkles } from 'lucide-react';
+import { Send, Bot, User, Sparkles, RotateCcw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { doc, getDoc, setDoc, updateDoc, arrayUnion, Timestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 interface Message {
   id: string;
@@ -17,6 +19,7 @@ interface UserProfile {
   diagnosis?: string[];
   symptoms?: string[];
   lastPeriod?: string;
+  cycleLength?: number;
   periodDuration?: number;
   irregularPeriods?: boolean;
   stressLevel?: string;
@@ -30,17 +33,11 @@ interface ChatbotCoachProps {
 }
 
 const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      text: `Hi there! 👋 I'm Auvra, your personal health coach, and I'm here to support you on your wellness journey. I can help you with diet recommendations, stress management, sleep tips, and so much more. What would you like to chat about today?`,
-      sender: 'bot',
-      timestamp: new Date(),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isUsingAI, setIsUsingAI] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
 
@@ -52,18 +49,103 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
     scrollToBottom();
   }, [messages]);
 
+  // Load conversation history from Firebase
+  useEffect(() => {
+    const loadConversationHistory = async () => {
+      if (!user?.uid) {
+        // If no user, show welcome message
+        setMessages([{
+          id: '1',
+          text: `Hi there! 👋 I'm Auvra, your personal health coach, and I'm here to support you on your wellness journey. I can help you with diet recommendations, stress management, sleep tips, and so much more. What would you like to chat about today?`,
+          sender: 'bot',
+          timestamp: new Date(),
+        }]);
+        setIsLoadingHistory(false);
+        return;
+      }
+
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          if (userData.conversationHistory && userData.conversationHistory.length > 0) {
+            // Convert Firestore timestamps back to Date objects
+            const loadedMessages = userData.conversationHistory.map((msg: any) => ({
+              ...msg,
+              timestamp: msg.timestamp instanceof Timestamp ? msg.timestamp.toDate() : new Date(msg.timestamp)
+            }));
+            setMessages(loadedMessages);
+          } else {
+            // No previous conversation, show welcome message
+            setMessages([{
+              id: '1',
+              text: `Hi there! 👋 I'm Auvra, your personal health coach, and I'm here to support you on your wellness journey. I can help you with diet recommendations, stress management, sleep tips, and so much more. What would you like to chat about today?`,
+              sender: 'bot',
+              timestamp: new Date(),
+            }]);
+          }
+        } else {
+          // New user, show welcome message
+          setMessages([{
+            id: '1',
+            text: `Hi there! 👋 I'm Auvra, your personal health coach, and I'm here to support you on your wellness journey. I can help you with diet recommendations, stress management, sleep tips, and so much more. What would you like to chat about today?`,
+            sender: 'bot',
+            timestamp: new Date(),
+          }]);
+        }
+      } catch (error) {
+        console.error('Error loading conversation history:', error);
+        // Fallback to welcome message
+        setMessages([{
+          id: '1',
+          text: `Hi there! 👋 I'm Auvra, your personal health coach, and I'm here to support you on your wellness journey. I can help you with diet recommendations, stress management, sleep tips, and so much more. What would you like to chat about today?`,
+          sender: 'bot',
+          timestamp: new Date(),
+        }]);
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    };
+
+    loadConversationHistory();
+  }, [user?.uid]);
+
+  // Save conversation to Firebase
+  const saveConversationToFirebase = async (newMessages: Message[]) => {
+    if (!user?.uid) return;
+
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      
+      // Convert Date objects to Firestore timestamps for storage
+      const messagesForStorage = newMessages.map(msg => ({
+        ...msg,
+        timestamp: Timestamp.fromDate(msg.timestamp)
+      }));
+
+      await updateDoc(userRef, {
+        conversationHistory: messagesForStorage,
+        lastConversationUpdate: Timestamp.now()
+      });
+    } catch (error) {
+      console.error('Error saving conversation to Firebase:', error);
+    }
+  };
+
   const generateChatGPTResponse = async (userMessage: string): Promise<string> => {
     try {
       // Create context from user profile
       const context = userProfile ? `
         User Profile:
         - Age: ${userProfile.age}
-        - Health Conditions: ${userProfile.diagnosis?.join(', ')}
-        - Symptoms: ${userProfile.symptoms?.join(', ')}
+        - Health Conditions: ${userProfile.diagnosis?.join(', ')}${userProfile.otherDiagnosis ? `, ${userProfile.otherDiagnosis}` : ''}
+        - Symptoms: ${userProfile.symptoms?.join(', ')}${userProfile.otherSymptoms ? `, ${userProfile.otherSymptoms}` : ''}
+        - Last Period: ${userProfile.lastPeriod ? new Date(userProfile.lastPeriod).toLocaleDateString() : 'Not specified'}
+        - Cycle Length: ${userProfile.cycleLength || 'Not specified'} days
+        - Period Duration: ${userProfile.periodDuration || 'Not specified'} days
+        - Irregular Periods: ${userProfile.irregularPeriods ? 'Yes' : 'No'}
         - Stress Level: ${userProfile.stressLevel}
         - Sleep Quality: ${userProfile.sleepQuality}
-        - Irregular Periods: ${userProfile.irregularPeriods ? 'Yes' : 'No'}
-        - Period Duration: ${userProfile.periodDuration} days
       ` : 'No user profile available';
 
       // Create conversation history for context
@@ -113,6 +195,12 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
       const isIrregular = userProfile.irregularPeriods;
       const stressLevel = userProfile.stressLevel;
       const sleepQuality = userProfile.sleepQuality;
+      const ageGroup = userProfile.age;
+      const symptoms = userProfile.symptoms || [];
+      const otherConditions = userProfile.otherDiagnosis;
+      const otherSymptoms = userProfile.otherSymptoms;
+      const cycleLength = userProfile.cycleLength;
+      const periodDuration = userProfile.periodDuration;
 
       // Diet recommendations
       if (lowerMessage.includes('diet') || lowerMessage.includes('food') || lowerMessage.includes('eat')) {
@@ -184,7 +272,8 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
       timestamp: new Date(),
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
     setInputMessage('');
     setIsTyping(true);
     setIsUsingAI(true);
@@ -197,7 +286,12 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
         sender: 'bot',
         timestamp: new Date(),
       };
-      setMessages(prev => [...prev, botMessage]);
+      
+      const finalMessages = [...updatedMessages, botMessage];
+      setMessages(finalMessages);
+      
+      // Save the complete conversation to Firebase
+      await saveConversationToFirebase(finalMessages);
     } catch (error) {
       console.error('Error getting response:', error);
       // Fallback to local response
@@ -208,7 +302,12 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
         sender: 'bot',
         timestamp: new Date(),
       };
-      setMessages(prev => [...prev, botMessage]);
+      
+      const finalMessages = [...updatedMessages, botMessage];
+      setMessages(finalMessages);
+      
+      // Save the complete conversation to Firebase even for fallback responses
+      await saveConversationToFirebase(finalMessages);
     } finally {
       setIsTyping(false);
       setIsUsingAI(false);
@@ -272,78 +371,140 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
     });
   };
 
+  // Clear conversation history
+  const clearConversationHistory = async () => {
+    if (!user?.uid) return;
+
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, {
+        conversationHistory: [],
+        lastConversationUpdate: Timestamp.now()
+      });
+      
+      // Reset to welcome message
+      setMessages([{
+        id: '1',
+        text: `Hi there! 👋 I'm Auvra, your personal health coach, and I'm here to support you on your wellness journey. I can help you with diet recommendations, stress management, sleep tips, and so much more. What would you like to chat about today?`,
+        sender: 'bot',
+        timestamp: new Date(),
+      }]);
+    } catch (error) {
+      console.error('Error clearing conversation history:', error);
+    }
+  };
+
   return (
     <div className="flex flex-col h-[700px] bg-white rounded-2xl border border-primary-100 shadow-lg overflow-hidden">
+      {/* Chat Header */}
+      <div className="shrink-0 border-b border-primary-100 p-4 bg-gradient-to-r from-primary-50 to-accent-50">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-accent-400 to-primary-400 flex items-center justify-center shadow-md">
+              <Bot className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-800">Auvra Health Coach</h3>
+              <p className="text-xs text-gray-600">Your personalized health companion</p>
+            </div>
+          </div>
+          {user && messages.length > 1 && (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={clearConversationHistory}
+              className="p-2 rounded-full bg-white border border-primary-200 text-gray-600 hover:text-primary-600 hover:border-primary-300 transition-all duration-200 shadow-sm"
+              title="Reset conversation"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </motion.button>
+          )}
+        </div>
+      </div>
+
       {/* Messages Container */}
       <div className="flex-1 overflow-y-auto p-6 min-h-0">
-        <div className="space-y-4 w-full">
-          <AnimatePresence>
-            {messages.map((message) => (
+        {isLoadingHistory ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-400 mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading your conversation history...</p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4 w-full">
+            <AnimatePresence>
+              {messages.map((message) => (
+                <motion.div
+                  key={message.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.3 }}
+                  className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div className={`flex items-start space-x-3 max-w-[85%] ${message.sender === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
+                    <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center shadow-md ${
+                      message.sender === 'user' 
+                        ? 'bg-gradient-to-r from-primary-400 to-accent-400' 
+                        : 'bg-gradient-to-r from-accent-400 to-primary-400'
+                    }`}>
+                      {message.sender === 'user' ? (
+                        <User className="w-5 h-5 text-white" />
+                      ) : (
+                        <Bot className="w-5 h-5 text-white" />
+                      )}
+                    </div>
+                    <div className={`rounded-2xl px-5 py-4 shadow-sm max-w-full ${
+                      message.sender === 'user'
+                        ? 'bg-gradient-to-r from-primary-400 to-accent-400 text-white'
+                        : 'bg-white border border-primary-100 text-gray-800 shadow-md'
+                    }`}>
+                      <div className={`text-sm leading-relaxed ${
+                        message.sender === 'user' ? 'text-white' : 'text-gray-700'
+                      }`}>
+                        {formatMessageText(message.text)}
+                      </div>
+                      <div className={`text-xs mt-3 ${
+                        message.sender === 'user' ? 'text-primary-100' : 'text-gray-500'
+                      }`}>
+                        {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+
+            {/* Typing indicator */}
+            {isTyping && (
               <motion.div
-                key={message.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.3 }}
-                className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                className="flex justify-start"
               >
-                <div className={`flex items-start space-x-3 max-w-[85%] ${message.sender === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
-                  <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center shadow-md ${
-                    message.sender === 'user' 
-                      ? 'bg-gradient-to-r from-primary-400 to-accent-400' 
-                      : 'bg-gradient-to-r from-accent-400 to-primary-400'
-                  }`}>
-                    {message.sender === 'user' ? (
-                      <User className="w-5 h-5 text-white" />
-                    ) : (
-                      <Bot className="w-5 h-5 text-white" />
-                    )}
+                <div className="flex items-start space-x-3 max-w-[85%]">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center shadow-md bg-gradient-to-r from-accent-400 to-primary-400">
+                    <Bot className="w-5 h-5 text-white" />
                   </div>
-                  <div className={`rounded-2xl px-5 py-4 shadow-sm max-w-full ${
-                    message.sender === 'user'
-                      ? 'bg-gradient-to-r from-primary-400 to-accent-400 text-white'
-                      : 'bg-white border border-primary-100 text-gray-800 shadow-md'
-                  }`}>
-                    <div className={`text-sm leading-relaxed ${
-                      message.sender === 'user' ? 'text-white' : 'text-gray-700'
-                    }`}>
-                      {formatMessageText(message.text)}
-                    </div>
-                    <div className={`text-xs mt-3 ${
-                      message.sender === 'user' ? 'text-primary-100' : 'text-gray-500'
-                    }`}>
-                      {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  <div className="rounded-2xl px-5 py-4 shadow-sm bg-white border border-primary-100">
+                    <div className="flex items-center space-x-2">
+                      <div className="flex space-x-1">
+                        <div className="w-2 h-2 bg-primary-400 rounded-full animate-bounce"></div>
+                        <div className="w-2 h-2 bg-primary-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                        <div className="w-2 h-2 bg-primary-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      </div>
+                      <span className="text-sm text-gray-500 ml-2">
+                        {isUsingAI ? 'Auvra is thinking...' : 'Typing...'}
+                      </span>
                     </div>
                   </div>
                 </div>
               </motion.div>
-            ))}
-          </AnimatePresence>
-
-          {/* Loading indicator */}
-          {isTyping && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex justify-start"
-            >
-              <div className="flex items-start space-x-3 max-w-[85%]">
-                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-r from-accent-400 to-primary-400 flex items-center justify-center shadow-md">
-                  <Bot className="w-5 h-5 text-white" />
-                </div>
-                <div className="bg-white border border-primary-100 rounded-2xl px-5 py-4 shadow-md">
-                  <div className="flex space-x-2">
-                    <div className="w-3 h-3 bg-primary-400 rounded-full animate-bounce"></div>
-                    <div className="w-3 h-3 bg-primary-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                    <div className="w-3 h-3 bg-primary-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          <div ref={messagesEndRef} />
-        </div>
+            )}
+          </div>
+        )}
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Input Area */}
