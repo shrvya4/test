@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Bot, User, Sparkles, RotateCcw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { doc, getDoc, setDoc, updateDoc, arrayUnion, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, arrayUnion, Timestamp, collection, addDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { differenceInDays, isSameDay, parseISO, parse, isValid } from 'date-fns';
 
@@ -479,11 +479,23 @@ const ChatbotCoach: React.FC<ChatbotCoachProps> = ({ userProfile }) => {
         // setUserProfile(updatedProfile);
         return;
       } catch (err) {
+        // Log error to Firestore
+        try {
+          await addDoc(collection(db, 'errorLogs'), {
+            userId: user?.uid,
+            error: err?.toString(),
+            context: `chatbot profile update (${updateIntent.field})`,
+            attemptedValue: updateIntent.value,
+            timestamp: new Date(),
+          });
+        } catch (logErr) {
+          // Ignore logging errors
+        }
         setMessages(prev => [
           ...prev,
           {
             id: (Date.now() + 2).toString(),
-            text: `Sorry, I couldn't update your ${updateIntent.field.replace(/([A-Z])/g, ' $1').toLowerCase()} right now. Please try again later!`,
+            text: `Sorry, I couldn't update your ${updateIntent.field.replace(/([A-Z])/g, ' $1').toLowerCase()} right now. Please try again later or use the Edit Profile section!`,
             sender: 'bot',
             timestamp: new Date(),
           },

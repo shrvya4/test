@@ -74,6 +74,8 @@ export default function ProfileEditor() {
             lastPeriodDate = new Date();
           }
         }
+        console.log('Firestore profile snapshot:', data);
+        console.log('Processed lastPeriod:', lastPeriodDate);
         const processedData: UserProfile = {
           ...data,
           lastPeriod: lastPeriodDate,
