@@ -27,8 +27,8 @@ export default function InputBox() {
       if (!res.ok) throw new Error("Failed to interpret command");
       setInput("");
       resetTranscript();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
