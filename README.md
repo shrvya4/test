@@ -1,36 +1,47 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Family Inventory & Shopping List App
 
-## Getting Started
+A full-stack web app using **Next.js**, **Tailwind CSS**, and **Firebase**, deployable on **Vercel**.
 
-First, run the development server:
+## Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- 🔐 **Authentication**: Firebase Auth (email/password)
+- 📦 **Inventory & Shopping List**: Firestore per-user collections
+- 🎤 **Voice & Text Input**: React Speech Recognition & text
+- 🧠 **Language Understanding**: OpenAI API (via Next.js API route)
+- 💅 **Frontend**: Clean dashboard with Tailwind CSS
+- 🚀 **Deployment**: One-click deploy to Vercel
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. **Clone & Install**
+   ```bash
+   git clone <repo-url>
+   cd family
+   npm install
+   ```
+2. **Configure Environment**
+   - Copy `.env.example` to `.env.local` and fill in your Firebase and OpenAI keys.
+3. **Run Locally**
+   ```bash
+   npm run dev
+   ```
+4. **Deploy**
+   - Push to GitHub and [deploy on Vercel](https://vercel.com/import).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## File Structure
 
-## Learn More
+- `src/firebase.ts` — Firebase config
+- `src/app/context/authContext.tsx` — Auth state
+- `src/app/components/InventoryList.tsx` — Inventory UI
+- `src/app/components/ShoppingList.tsx` — Shopping list UI
+- `src/app/components/InputBox.tsx` — Text/voice input
+- `src/app/api/interpret.ts` — OpenAI intent API
 
-To learn more about Next.js, take a look at the following resources:
+## Environment Variables
+See `.env.example` for required variables:
+- `NEXT_PUBLIC_FIREBASE_*`
+- `OPENAI_API_KEY`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Notes
+- All backend logic is in Next.js API routes (no external server needed)
+- App is ready for Vercel deployment
